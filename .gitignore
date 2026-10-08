@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 插件数据与本地调试产物（dist/ 下的联邦构建产物必须提交，勿忽略）
+*.log
+.env
+.DS_Store
