@@ -34,7 +34,7 @@ class PanBox(_PluginBase):
     plugin_name = "网盘助手"
     plugin_desc = "自建 Telegram 频道资源搜索，并把网盘分享一键转存到自己的网盘。"
     plugin_icon = "panbox.png"
-    plugin_version = "0.2.2"
+    plugin_version = "0.2.3"
     plugin_order = 100
 
     def __init__(self) -> None:

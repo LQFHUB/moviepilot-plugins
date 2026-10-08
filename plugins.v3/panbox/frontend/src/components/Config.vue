@@ -6,12 +6,13 @@
  * - props：`initialConfig`（当前已保存配置）、`api`、`pluginId`、`sourcePluginId`、`nativeSubscribe`；
  * - emits：`save`（携带**完整**配置对象，由宿主 PUT 保存）、`layout`（`{ maxWidth }`）、`switch`、`close`。
  *
- * 界面设计（参考同类插件的设置面板，并遵守可读性底线）：
- * - 固定高度外壳 + 左侧分组导航 + 右侧内容区内部滚动，弹窗不随内容抖动；
- * - 设置项按「基础 / 搜索渠道 / 115 网盘 / 数据与历史」分类，每类一个导航项；
- * - 小字号紧凑排版：正文与标签 13px、辅助说明 12px、导航分组标题 11px；
- *   **不采用**同类插件里 9~10px 的正文，避免可读性与对比度不达标；
- * - 输入控件统一 `density="compact"`，行间距 8px 节奏。
+ * 排版规则（对照「网盘订阅助手」的设置面板，统一为一套字段系统）：
+ * - 左侧分类导航 + 右侧内容区内部滚动，弹窗固定高度不抖动；
+ * - 内容区按**分组**组织：分组标题（图标 + 标题 + 右侧说明）→ 分隔线 → 密集网格；
+ * - 字段一律「标签在输入框内」（Vuetify `label`），说明走 `persistent-hint` 的 details 行，
+ *   不再使用「左标签列 + 右侧控件 + 独立说明行」那种参差布局；
+ * - 所有输入框强制统一 40px 高、8px 圆角，details 行固定 18px，保证纵向节奏一致；
+ * - 小字号：标签/正文 13px、说明 11~12px、导航分组标题 11px。
  *
  * 本组件**不**自行保存配置，也不接触任何 Token：所有网络请求都走宿主注入的 api 对象。
  */
@@ -53,9 +54,17 @@ const DEFAULT_FORM = {
   p115_transfer_path: '',
   history_limit: 500,
   history_auto_record: true,
+  auto_sync_enabled: false,
+  auto_sync_cron: '0 */6 * * *',
+  auto_sync_cloud_types: ['p115'],
+  auto_sync_prefer_keywords: '4K,2160p,REMUX,高码',
+  auto_sync_exclude_keywords: '预告,花絮,TS,枪版',
+  auto_sync_min_size_gb: 0,
+  auto_sync_max_size_gb: 0,
+  auto_sync_max_per_run: 3,
 }
 
-/** 分类导航：分组 → 分类项，与下方内容区一一对应 */
+/** 分类导航：分组 → 分类项 */
 const NAV_GROUPS = [
   {
     name: '插件运行',
@@ -65,19 +74,33 @@ const NAV_GROUPS = [
     ],
   },
   {
-    name: '网盘与数据',
+    name: '网盘与订阅',
     items: [
       { value: 'drive', title: '115 网盘', icon: 'mdi-cloud-upload-outline' },
-      { value: 'data', title: '数据与历史', icon: 'mdi-database-outline' },
+      { value: 'subscribe', title: '网盘订阅', icon: 'mdi-bell-ring-outline' },
     ],
+  },
+  {
+    name: '数据',
+    items: [{ value: 'data', title: '数据与历史', icon: 'mdi-database-outline' }],
   },
 ]
 
-/** 每个分类包含的配置键，用于「未保存修改」提示 */
+/** 每个分类包含的配置键，用于「有未保存修改」标记 */
 const SECTION_KEYS = {
   basic: ['enabled'],
   search: ['channels', 'search_limit', 'search_filter', 'search_timeout', 'search_base_url'],
   drive: ['p115_enabled', 'p115_cookie', 'p115_transfer_cid', 'p115_transfer_path'],
+  subscribe: [
+    'auto_sync_enabled',
+    'auto_sync_cron',
+    'auto_sync_cloud_types',
+    'auto_sync_prefer_keywords',
+    'auto_sync_exclude_keywords',
+    'auto_sync_min_size_gb',
+    'auto_sync_max_size_gb',
+    'auto_sync_max_per_run',
+  ],
   data: ['history_limit', 'history_auto_record'],
 }
 
@@ -90,20 +113,27 @@ const SECTION_KEYS = {
 function normalize(raw) {
   const source = raw && typeof raw === 'object' ? raw : {}
   const form = { ...DEFAULT_FORM, ...source }
-  form.enabled = Boolean(form.enabled)
-  form.search_filter = Boolean(form.search_filter)
-  form.p115_enabled = Boolean(form.p115_enabled)
-  form.history_auto_record = Boolean(form.history_auto_record)
+  for (const key of ['enabled', 'search_filter', 'p115_enabled', 'history_auto_record', 'auto_sync_enabled']) {
+    form[key] = Boolean(form[key])
+  }
   form.channels = (Array.isArray(form.channels) ? form.channels : [])
     .filter((entry) => entry && typeof entry === 'object')
     .map((entry) => ({ id: String(entry.id ?? ''), name: String(entry.name ?? '') }))
   form.search_limit = Number(form.search_limit) || DEFAULT_FORM.search_limit
   form.search_timeout = Number(form.search_timeout) || DEFAULT_FORM.search_timeout
   form.history_limit = Number(form.history_limit) || DEFAULT_FORM.history_limit
+  form.auto_sync_max_per_run = Number(form.auto_sync_max_per_run) || DEFAULT_FORM.auto_sync_max_per_run
+  form.auto_sync_min_size_gb = Number(form.auto_sync_min_size_gb) || 0
+  form.auto_sync_max_size_gb = Number(form.auto_sync_max_size_gb) || 0
   form.search_base_url = String(form.search_base_url || DEFAULT_FORM.search_base_url)
   form.p115_cookie = String(form.p115_cookie ?? '')
   form.p115_transfer_cid = String(form.p115_transfer_cid || '0')
   form.p115_transfer_path = String(form.p115_transfer_path ?? '')
+  form.auto_sync_cron = String(form.auto_sync_cron || DEFAULT_FORM.auto_sync_cron)
+  form.auto_sync_prefer_keywords = String(form.auto_sync_prefer_keywords ?? '')
+  form.auto_sync_exclude_keywords = String(form.auto_sync_exclude_keywords ?? '')
+  const types = form.auto_sync_cloud_types
+  form.auto_sync_cloud_types = Array.isArray(types) && types.length ? types.map(String) : ['p115']
   return form
 }
 
@@ -120,6 +150,18 @@ const folderDialog = ref(false)
 const channelCount = computed(() => form.channels.filter((entry) => String(entry.id || '').trim()).length)
 /** 115 是否已具备转存条件（开关打开且填了 Cookie） */
 const is115Ready = computed(() => Boolean(form.p115_enabled) && Boolean(String(form.p115_cookie || '').trim()))
+/** 自动同步是否已就绪（开启且 115 可用） */
+const isAutoReady = computed(() => Boolean(form.auto_sync_enabled) && is115Ready.value)
+/** 网盘类型以逗号串形式编辑 */
+const cloudTypesText = computed({
+  get: () => (form.auto_sync_cloud_types || []).join(','),
+  set: (value) => {
+    form.auto_sync_cloud_types = String(value || '')
+      .split(/[,，\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  },
+})
 
 /** 当前导航项（用于内容区标题） */
 const activeNavItem = computed(() => {
@@ -146,15 +188,14 @@ const hasUnsavedChanges = computed(() => dirtySections.value.size > 0)
 watch(
   () => props.initialConfig,
   (value) => {
-    const next = normalize(value)
-    Object.assign(form, next)
+    Object.assign(form, normalize(value))
     snapshot.value = normalize(value)
   },
   { deep: true },
 )
 
 onMounted(() => {
-  // 告知宿主对话框建议宽度：左侧导航 + 右侧表单需要更宽的版面
+  // 告知宿主对话框建议宽度：左侧导航 + 右侧两列字段需要更宽版面
   emit('layout', { maxWidth: '76rem' })
 })
 
@@ -195,6 +236,14 @@ function buildPayload() {
     p115_transfer_path: String(form.p115_transfer_path || '').trim(),
     history_limit: Number(form.history_limit) || DEFAULT_FORM.history_limit,
     history_auto_record: Boolean(form.history_auto_record),
+    auto_sync_enabled: Boolean(form.auto_sync_enabled),
+    auto_sync_cron: String(form.auto_sync_cron || '').trim() || DEFAULT_FORM.auto_sync_cron,
+    auto_sync_cloud_types: (form.auto_sync_cloud_types || []).length ? form.auto_sync_cloud_types : ['p115'],
+    auto_sync_prefer_keywords: String(form.auto_sync_prefer_keywords || '').trim(),
+    auto_sync_exclude_keywords: String(form.auto_sync_exclude_keywords || '').trim(),
+    auto_sync_min_size_gb: Number(form.auto_sync_min_size_gb) || 0,
+    auto_sync_max_size_gb: Number(form.auto_sync_max_size_gb) || 0,
+    auto_sync_max_per_run: Number(form.auto_sync_max_per_run) || DEFAULT_FORM.auto_sync_max_per_run,
   }
 }
 
@@ -207,6 +256,11 @@ function submit() {
   if (!payload.channels.length) {
     activeSection.value = 'search'
     errorText.value = '至少需要配置一个 Telegram 频道，频道 ID 为频道用户名（不含 @ 与 t.me 前缀）'
+    return
+  }
+  if (form.auto_sync_enabled && !is115Ready.value) {
+    activeSection.value = 'drive'
+    errorText.value = '开启「自动同步」需要同时启用 115 并填好 Cookie，否则无法自动转存'
     return
   }
   emit('save', payload)
@@ -257,6 +311,9 @@ function onFolderSelected(payload) {
         </span>
         <span class="pbx-chip" :class="is115Ready ? 'pbx-chip--on' : 'pbx-chip--muted'">
           {{ is115Ready ? '115 已就绪' : '115 未就绪' }}
+        </span>
+        <span class="pbx-chip" :class="isAutoReady ? 'pbx-chip--on' : 'pbx-chip--muted'">
+          {{ form.auto_sync_enabled ? (isAutoReady ? '自动同步开启' : '自动同步缺 115') : '自动同步关闭' }}
         </span>
         <span v-if="hasUnsavedChanges" class="pbx-chip pbx-chip--warn">有未保存修改</span>
         <v-spacer />
@@ -309,228 +366,382 @@ function onFolderSelected(payload) {
 
           <!-- 基础设置 -->
           <template v-if="activeSection === 'basic'">
-            <div class="pbx-field">
-              <div class="pbx-field__label">启用插件</div>
-              <div class="pbx-field__control">
-                <v-switch v-model="form.enabled" color="primary" density="compact" hide-details />
-                <div class="pbx-hint">关闭后侧栏入口与全部接口都会返回「插件未启用」。</div>
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-power-plug-outline" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">运行开关</span>
+                <span class="pbx-group__hint">关闭后侧栏入口与全部接口都会返回「插件未启用」</span>
               </div>
-            </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" md="6" class="pbx-col">
+                  <v-switch
+                    v-model="form.enabled"
+                    label="启用网盘助手插件"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+            </section>
           </template>
 
           <!-- 搜索渠道 -->
           <template v-else-if="activeSection === 'search'">
-            <div class="pbx-field">
-              <div class="pbx-field__label">频道列表</div>
-              <div class="pbx-field__control">
-                <div class="pbx-inline">
-                  <span class="pbx-hint pbx-hint--inline">共 {{ channelCount }} 个有效频道，填频道用户名（不含 @ 与 t.me/s/ 前缀）</span>
-                  <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-plus" @click="addChannel">
-                    添加频道
-                  </v-btn>
-                </div>
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-format-list-bulleted" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">频道列表</span>
+                <span class="pbx-group__hint">填频道用户名，不含 @ 与 t.me/s/ 前缀</span>
+                <v-spacer />
+                <v-btn size="x-small" variant="tonal" color="primary" prepend-icon="mdi-plus" @click="addChannel">
+                  添加
+                </v-btn>
+              </div>
+              <v-divider class="pbx-group__divider" />
+              <v-alert v-if="!form.channels.length" type="warning" variant="tonal" density="compact" class="mb-2">
+                尚未配置频道，搜索将无结果。
+              </v-alert>
+              <div v-for="(channel, index) in form.channels" :key="index" class="pbx-channel">
+                <span class="pbx-channel__index">{{ index + 1 }}</span>
+                <v-text-field
+                  v-model="channel.id"
+                  placeholder="频道用户名，如 Quark_Movies"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                />
+                <v-text-field
+                  v-model="channel.name"
+                  placeholder="显示名称（可选）"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                />
+                <v-btn
+                  icon="mdi-delete-outline"
+                  variant="text"
+                  color="error"
+                  size="x-small"
+                  :title="`删除第 ${index + 1} 个频道`"
+                  :aria-label="`删除第 ${index + 1} 个频道`"
+                  @click="removeChannel(index)"
+                />
+              </div>
+            </section>
 
-                <v-alert v-if="!form.channels.length" type="warning" variant="tonal" density="compact" class="pbx-alert">
-                  尚未配置频道，搜索将无结果。
-                </v-alert>
-
-                <div v-for="(channel, index) in form.channels" :key="index" class="pbx-channel">
-                  <span class="pbx-channel__index">{{ index + 1 }}</span>
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-tune" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">搜索行为</span>
+              </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" sm="6" md="4" class="pbx-col">
                   <v-text-field
-                    v-model="channel.id"
-                    placeholder="频道用户名，如 Quark_Movies"
+                    v-model.number="form.search_limit"
+                    type="number"
+                    min="1"
+                    max="200"
+                    suffix="条"
+                    label="单频道结果上限"
+                    hint="单次搜索每个频道最多返回条数"
+                    persistent-hint
                     density="compact"
                     variant="outlined"
-                    hide-details
                   />
+                </v-col>
+                <v-col cols="12" sm="6" md="4" class="pbx-col">
                   <v-text-field
-                    v-model="channel.name"
-                    placeholder="显示名称（可选）"
+                    v-model.number="form.search_timeout"
+                    type="number"
+                    min="5"
+                    max="120"
+                    suffix="秒"
+                    label="请求超时"
+                    hint="抓取频道页与调用网盘接口的超时"
+                    persistent-hint
                     density="compact"
                     variant="outlined"
-                    hide-details
                   />
-                  <v-btn
-                    icon="mdi-delete-outline"
-                    variant="text"
-                    color="error"
-                    size="small"
-                    :title="`删除第 ${index + 1} 个频道`"
-                    :aria-label="`删除第 ${index + 1} 个频道`"
-                    @click="removeChannel(index)"
+                </v-col>
+                <v-col cols="12" md="4" class="pbx-col">
+                  <v-text-field
+                    v-model="form.search_base_url"
+                    label="搜索基础地址"
+                    hint="默认 https://t.me/s"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
                   />
-                </div>
-              </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">单频道结果上限</div>
-              <div class="pbx-field__control pbx-field__control--narrow">
-                <v-text-field
-                  v-model.number="form.search_limit"
-                  type="number"
-                  min="1"
-                  max="200"
-                  suffix="条"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <div class="pbx-hint">单次搜索每个频道最多返回的条数。</div>
-              </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">请求超时</div>
-              <div class="pbx-field__control pbx-field__control--narrow">
-                <v-text-field
-                  v-model.number="form.search_timeout"
-                  type="number"
-                  min="5"
-                  max="120"
-                  suffix="秒"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <div class="pbx-hint">抓取 t.me 预览页与调用网盘接口的超时时间。</div>
-              </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">关键词过滤</div>
-              <div class="pbx-field__control">
-                <v-switch v-model="form.search_filter" color="primary" density="compact" hide-details />
-                <div class="pbx-hint">Telegram 站内搜索为模糊匹配，开启后仅保留标题/正文包含关键词的结果。</div>
-              </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">搜索基础地址</div>
-              <div class="pbx-field__control">
-                <v-text-field
-                  v-model="form.search_base_url"
-                  placeholder="https://t.me/s"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <div class="pbx-hint">默认 <code>https://t.me/s</code>，仅在官方预览页失效时调整。</div>
-              </div>
-            </div>
-
+                </v-col>
+                <v-col cols="12" class="pbx-col">
+                  <v-switch
+                    v-model="form.search_filter"
+                    label="按关键词后置过滤"
+                    color="primary"
+                    density="compact"
+                    hide-details="auto"
+                    hint="Telegram 站内搜索是模糊匹配，开启后仅保留标题/正文含关键词的结果"
+                    persistent-hint
+                  />
+                </v-col>
+              </v-row>
+            </section>
           </template>
 
           <!-- 115 网盘 -->
           <template v-else-if="activeSection === 'drive'">
-            <div class="pbx-field">
-              <div class="pbx-field__label">启用 115 转存</div>
-              <div class="pbx-field__control">
-                <v-switch v-model="form.p115_enabled" color="primary" density="compact" hide-details />
-                <div class="pbx-hint">关闭时搜索结果仍可浏览与复制链接，但不提供一键转存。</div>
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-account-key-outline" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">账号</span>
+                <span class="pbx-group__hint">Cookie 只保存在你的 MoviePilot 配置中</span>
               </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">115 Cookie</div>
-              <div class="pbx-field__control">
-                <div class="pbx-inline">
-                  <v-text-field
-                    v-model="form.p115_cookie"
-                    class="pbx-grow"
-                    :type="showCookie ? 'text' : 'password'"
-                    :append-inner-icon="showCookie ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-                    placeholder="浏览器登录 115 后复制完整 Cookie"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                    autocomplete="off"
-                    @click:append-inner="showCookie = !showCookie"
-                  />
-                  <v-btn
-                    size="small"
-                    variant="tonal"
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" md="4" class="pbx-col">
+                  <v-switch
+                    v-model="form.p115_enabled"
+                    label="启用 115 转存"
                     color="primary"
-                    prepend-icon="mdi-lan-connect"
-                    :loading="checking"
-                    @click="testCookie"
-                  >
-                    测试
-                  </v-btn>
-                </div>
-                <div class="pbx-hint">
-                  浏览器登录 115 后，从开发者工具复制完整 Cookie 粘贴到此处；仅保存在你的 MoviePilot 配置中，不会发送给第三方。
-                </div>
-              </div>
-            </div>
+                    density="compact"
+                    hide-details="auto"
+                    hint="关闭时只能浏览与复制链接"
+                    persistent-hint
+                  />
+                </v-col>
+                <v-col cols="12" md="8" class="pbx-col">
+                  <div class="pbx-inline">
+                    <v-text-field
+                      v-model="form.p115_cookie"
+                      class="pbx-grow"
+                      label="115 Cookie"
+                      :type="showCookie ? 'text' : 'password'"
+                      :append-inner-icon="showCookie ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                      hint="浏览器登录 115 后从开发者工具复制完整 Cookie"
+                      persistent-hint
+                      density="compact"
+                      variant="outlined"
+                      autocomplete="off"
+                      @click:append-inner="showCookie = !showCookie"
+                    />
+                    <v-btn
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      prepend-icon="mdi-lan-connect"
+                      :loading="checking"
+                      @click="testCookie"
+                    >
+                      测试
+                    </v-btn>
+                  </div>
+                </v-col>
+              </v-row>
+            </section>
 
-            <div class="pbx-field">
-              <div class="pbx-field__label">默认转存目录</div>
-              <div class="pbx-field__control">
-                <div class="pbx-inline">
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-folder-arrow-up-down-outline" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">默认转存目标</span>
+                <span class="pbx-group__hint">转存与自动同步都会落到这里</span>
+                <v-spacer />
+                <v-btn
+                  size="x-small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="mdi-folder-search-outline"
+                  @click="folderDialog = true"
+                >
+                  选择目录
+                </v-btn>
+              </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" sm="4" md="3" class="pbx-col">
                   <v-text-field
                     v-model="form.p115_transfer_cid"
-                    class="pbx-field__control--narrow"
-                    placeholder="0"
+                    label="目录 ID"
+                    hint="0 表示根目录"
+                    persistent-hint
                     density="compact"
                     variant="outlined"
-                    hide-details
                   />
+                </v-col>
+                <v-col cols="12" sm="8" md="9" class="pbx-col">
                   <v-text-field
                     v-model="form.p115_transfer_path"
-                    class="pbx-grow"
-                    placeholder="目录路径（备注）"
+                    label="目录路径（备注）"
+                    hint="由「选择目录」自动填充，仅用于显示"
+                    persistent-hint
                     density="compact"
                     variant="outlined"
-                    hide-details
                   />
-                  <v-btn
-                    size="small"
-                    variant="tonal"
-                    color="primary"
-                    prepend-icon="mdi-folder-search-outline"
-                    @click="folderDialog = true"
-                  >
-                    选择
-                  </v-btn>
-                </div>
-                <div class="pbx-hint">
-                  左侧为目录 ID（<code>0</code> 表示根目录），右侧仅作显示备注；点「选择」可让插件读取网盘目录。
-                </div>
-              </div>
-            </div>
+                </v-col>
+              </v-row>
+              <v-alert v-if="!String(form.p115_cookie || '').trim()" type="info" variant="tonal" density="compact">
+                未配置 Cookie 时，转存与目录浏览接口都会返回「未配置 115 Cookie」。
+              </v-alert>
+            </section>
+          </template>
 
-            <v-alert v-if="!String(form.p115_cookie || '').trim()" type="info" variant="tonal" density="compact" class="pbx-alert">
-              未配置 Cookie 时，转存与目录浏览接口都会返回「未配置 115 Cookie」。
-            </v-alert>
+          <!-- 网盘订阅（自动同步） -->
+          <template v-else-if="activeSection === 'subscribe'">
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-sync" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">自动同步</span>
+                <span class="pbx-group__hint">定时在频道里找资源并自动转存到 115</span>
+              </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" md="4" class="pbx-col">
+                  <v-switch
+                    v-model="form.auto_sync_enabled"
+                    label="启用自动同步"
+                    color="primary"
+                    density="compact"
+                    hide-details="auto"
+                    :hint="is115Ready ? '按下方 cron 定时执行' : '需先启用 115 并填好 Cookie'"
+                    persistent-hint
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="4" class="pbx-col">
+                  <v-text-field
+                    v-model="form.auto_sync_cron"
+                    label="执行周期（cron）"
+                    hint="例：0 */6 * * * 表示每 6 小时"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="4" class="pbx-col">
+                  <v-text-field
+                    v-model.number="form.auto_sync_max_per_run"
+                    type="number"
+                    min="1"
+                    max="20"
+                    suffix="个"
+                    label="单次最多转存"
+                    hint="每个订阅每次执行的上限"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+            </section>
+
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-filter-variant" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">选片规则</span>
+                <span class="pbx-group__hint">体积取自 115 分享真实解析，超限不会转存</span>
+              </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" md="6" class="pbx-col">
+                  <v-text-field
+                    v-model="cloudTypesText"
+                    label="允许的网盘类型"
+                    hint="逗号分隔，当前驱动仅支持 p115"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" md="6" class="pbx-col">
+                  <v-text-field
+                    v-model="form.auto_sync_prefer_keywords"
+                    label="偏好关键词"
+                    hint="命中越多越优先，逗号分隔"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" md="6" class="pbx-col">
+                  <v-text-field
+                    v-model="form.auto_sync_exclude_keywords"
+                    label="排除关键词"
+                    hint="标题/正文命中即跳过，逗号分隔"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="3" class="pbx-col">
+                  <v-text-field
+                    v-model.number="form.auto_sync_min_size_gb"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    suffix="GB"
+                    label="体积下限"
+                    hint="0 = 不限制"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="3" class="pbx-col">
+                  <v-text-field
+                    v-model.number="form.auto_sync_max_size_gb"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    suffix="GB"
+                    label="体积上限"
+                    hint="0 = 不限制"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+            </section>
           </template>
 
           <!-- 数据与历史 -->
           <template v-else-if="activeSection === 'data'">
-            <div class="pbx-field">
-              <div class="pbx-field__label">自动记录历史</div>
-              <div class="pbx-field__control">
-                <v-switch v-model="form.history_auto_record" color="primary" density="compact" hide-details />
-                <div class="pbx-hint">搜索命中与转存结果自动写入历史；同一资源同来源会去重。</div>
+            <section class="pbx-group">
+              <div class="pbx-group__head">
+                <v-icon icon="mdi-history" size="14" class="pbx-group__icon" />
+                <span class="pbx-group__title">历史记录</span>
+                <span class="pbx-group__hint">同一资源同来源会去重</span>
               </div>
-            </div>
-
-            <div class="pbx-field">
-              <div class="pbx-field__label">历史上限</div>
-              <div class="pbx-field__control pbx-field__control--narrow">
-                <v-text-field
-                  v-model.number="form.history_limit"
-                  type="number"
-                  min="10"
-                  max="5000"
-                  suffix="条"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <div class="pbx-hint">超出后自动丢弃最早的记录；收藏不受此限制。</div>
-              </div>
-            </div>
+              <v-divider class="pbx-group__divider" />
+              <v-row dense class="pbx-fields">
+                <v-col cols="12" md="6" class="pbx-col">
+                  <v-switch
+                    v-model="form.history_auto_record"
+                    label="自动记录搜索与转存历史"
+                    color="primary"
+                    density="compact"
+                    hide-details="auto"
+                    hint="包含订阅自动转存的结果"
+                    persistent-hint
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="3" class="pbx-col">
+                  <v-text-field
+                    v-model.number="form.history_limit"
+                    type="number"
+                    min="10"
+                    max="5000"
+                    suffix="条"
+                    label="历史上限"
+                    hint="超出后丢弃最早记录"
+                    persistent-hint
+                    density="compact"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+            </section>
           </template>
         </section>
       </div>
@@ -556,7 +767,7 @@ function onFolderSelected(payload) {
 </template>
 
 <style scoped>
-/* 固定高度外壳：宽 76rem、高不超过视口，内部滚动，弹窗不随内容抖动 */
+/* ============ 外壳：固定高度、内部滚动 ============ */
 .pbx-config {
   display: flex;
   width: min(76rem, calc(100vw - 32px));
@@ -567,7 +778,6 @@ function onFolderSelected(payload) {
   min-height: 0;
 }
 
-/* 让宿主 overlay 容器参与高度约束，避免外层把内容撑高 */
 :global(.v-overlay__content:has(.pbx-config)) {
   overflow: hidden !important;
   border-radius: 10px !important;
@@ -590,7 +800,7 @@ function onFolderSelected(payload) {
   border-radius: 10px;
 }
 
-/* 顶栏 */
+/* ============ 顶栏 ============ */
 .pbx-header {
   display: flex;
   align-items: center;
@@ -641,7 +851,7 @@ function onFolderSelected(payload) {
   border-color: rgba(var(--v-theme-warning), 0.3);
 }
 
-/* 主体：左导航 + 右内容 */
+/* ============ 主体：左导航 + 右内容 ============ */
 .pbx-body {
   display: flex;
   flex: 1 1 auto;
@@ -748,7 +958,7 @@ function onFolderSelected(payload) {
   font-weight: 600;
 }
 
-/* 内容区 */
+/* ============ 内容区 ============ */
 .pbx-content {
   flex: 1 1 auto;
   min-width: 0;
@@ -762,7 +972,7 @@ function onFolderSelected(payload) {
   align-items: center;
   gap: 6px;
   padding-bottom: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
@@ -786,65 +996,112 @@ function onFolderSelected(payload) {
   font-size: 0.75rem;
 }
 
-/* 行式字段：左标签 + 右控件，紧凑但保持 8px 节奏 */
-.pbx-field {
-  display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
-  gap: 8px 12px;
-  padding: 7px 0;
-  align-items: start;
-  border-bottom: 1px dashed rgba(var(--v-border-color), calc(var(--v-border-opacity) * 0.7));
+/* ---- 分组：标题行 + 分隔线 + 密集网格 ---- */
+.pbx-group {
+  margin-bottom: 16px;
 }
 
-.pbx-field:last-of-type {
-  border-bottom: 0;
+.pbx-group:last-of-type {
+  margin-bottom: 4px;
 }
 
-.pbx-field__label {
-  padding-top: 6px;
+.pbx-group__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.pbx-group__icon {
+  opacity: 0.65;
+}
+
+.pbx-group__title {
   font-size: 0.8125rem;
-  color: rgba(var(--v-theme-on-surface), 0.8);
-  line-height: 1.25;
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.9);
 }
 
-.pbx-field__control {
+.pbx-group__hint {
+  font-size: 0.6875rem;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pbx-group__divider {
+  margin: 5px 0 8px;
+  opacity: 0.6;
+}
+
+.pbx-fields {
+  width: 100%;
+  margin-inline: -4px;
+}
+
+.pbx-col {
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+/* 统一字段尺寸：40px 高、8px 圆角、details 行固定高度 */
+.pbx-col :deep(.v-input) {
+  width: 100%;
   min-width: 0;
 }
 
-.pbx-field__control--narrow {
-  max-width: 11rem;
+.pbx-col :deep(.v-field) {
+  width: 100%;
+  min-width: 0;
+  height: 40px !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
 }
 
-.pbx-hint {
-  margin-top: 3px;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  color: rgba(var(--v-theme-on-surface), 0.62);
+.pbx-col :deep(.v-field__input) {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+  font-size: 0.8125rem;
 }
 
-.pbx-hint--inline {
-  margin-top: 0;
+.pbx-col :deep(.v-field__append-inner),
+.pbx-col :deep(.v-field__prepend-inner) {
+  padding-top: 0 !important;
+  display: flex;
+  align-items: center;
 }
 
-.pbx-hint code {
-  padding: 0 3px;
-  border-radius: 3px;
-  background: rgba(var(--v-theme-on-surface), 0.08);
+.pbx-col :deep(.v-input__details) {
+  padding-inline: 4px;
+  min-height: 18px;
+}
+
+.pbx-col :deep(.v-input__details .v-messages) {
   font-size: 0.6875rem;
 }
 
-.pbx-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+/* 开关与字段同基线 */
+.pbx-col :deep(.v-switch) {
+  min-height: 40px;
+  margin: 0;
+  padding-inline: 4px;
 }
 
-.pbx-grow {
-  flex: 1 1 14rem;
-  min-width: 0;
+.pbx-col :deep(.v-switch .v-label) {
+  font-size: 0.8125rem;
+  opacity: 1;
 }
 
+.pbx-col :deep(.v-selection-control) {
+  min-height: 40px;
+}
+
+/* ---- 频道列表（内部子行） ---- */
 .pbx-channel {
   display: grid;
   grid-template-columns: 1.25rem minmax(0, 1.4fr) minmax(0, 1fr) auto;
@@ -860,7 +1117,20 @@ function onFolderSelected(payload) {
   font-variant-numeric: tabular-nums;
 }
 
-/* 底栏 */
+/* ---- 行内组合（输入 + 按钮） ---- */
+.pbx-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pbx-grow {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+/* ============ 底栏 ============ */
 .pbx-footer {
   display: flex;
   align-items: center;
@@ -876,7 +1146,7 @@ function onFolderSelected(payload) {
   margin-right: 4px;
 }
 
-/* 小屏：导航转为顶部横向、字段转为上下堆叠 */
+/* ============ 小屏 ============ */
 @media (max-width: 720px) {
   .pbx-config {
     width: calc(100vw - 16px);
@@ -913,15 +1183,6 @@ function onFolderSelected(payload) {
   .pbx-nav__item {
     width: auto;
     white-space: nowrap;
-  }
-
-  .pbx-field {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-
-  .pbx-field__label {
-    padding-top: 0;
   }
 
   .pbx-channel {
