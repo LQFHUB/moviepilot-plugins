@@ -168,13 +168,15 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.0（规划） | vue 联邦 | 规划中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/Agent 工具 |
+| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.0 | vue 联邦 | 开发中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
 
-`PanBox` 详情：
-- **参考来源**：`CloudSubscribe`（网盘订阅助手，仅参考功能边界与驱动思路，**不复刻代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，仅参考 TG 搜索频道思路；其开源版为 V0.2.5，线上镜像为 0.9.1，两者能力差异大）。
-- **搜索实现**：自建抓取 `t.me/s/<频道>` 公开网页并解析资源，频道列表由插件配置，不依赖 CloudSaver 运行。
-- **转存实现**：插件内直连网盘驱动（具体驱动与凭证形式待驱动层分析完成后填入）。
-- **明确不做**：通知/媒体库刷新（用户未选）、榜单自动订阅、站点签到、整理/刮削/STRM、AI Agent 工具。
+`PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
+- **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
+- **本仓库许可证：暂不加**（版权保留）。若日后复用 GPL-3.0 项目代码，PanBox 须整体以 GPL-3.0 发布。
+- **搜索实现**：自建抓取 `https://t.me/s/<频道>?q=<关键词>` 公开预览页，用宿主自带的 beautifulsoup4 解析；频道列表由插件配置（默认 5 个）。已实测：真实频道能命中并解析出网盘链接与提取码。Telegram 站内搜索为模糊匹配，需按 `search_filter` 做后置过滤。
+- **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
+- **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
+- **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（9 项纯逻辑单测，已通过）。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
 
