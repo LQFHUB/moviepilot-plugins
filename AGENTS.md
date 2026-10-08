@@ -145,7 +145,7 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 
 ## 8. Git 与 GitHub（本目录即插件仓库）
 
-- **仓库形态**：本目录就是插件仓库根，用 Git 管理并推送到 GitHub（账号 `LQFHUB`；Token 见知识库 `autu.md` 的「GitHub」节，**不得写入仓库**）。
+- **仓库形态**：本目录就是插件仓库根，用 Git 管理并推送到 GitHub：`https://github.com/LQFHUB/moviepilot-plugins`（public，`main` 分支；Token 见知识库 `autu.md` 的「GitHub」节，**不得写入仓库或 remote URL**）。
 - **一插件一目录**：每开发一个新插件，就在 `plugins.v3/<plugin_id_lower>/` 新建独立目录，并在 `package.v3.json` 追加同名条目；插件之间不共享代码文件，也不要把新插件塞进别的插件目录。
 - **必须提交的内容**：市场安装只读取 `<repo>/package.v3.json` 与 `<repo>/plugins.v3/<id_lower>/`（`client.py:490-536`）；Vue 联邦插件的 `dist/assets/` 构建产物也要提交——宿主不会替插件构建前端。
 - **提交前**：完成第 7 节自检；`.gitignore` 至少覆盖 `__pycache__/`、`*.py[cod]`、`.venv/`，但**不要**忽略 `dist/assets/`。
@@ -154,8 +154,8 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 
 主路线（已定）：**GitHub 仓库 + 插件市场源**
 
-1. 本目录推送到 GitHub 插件仓库。
-2. 在 MoviePilot 系统设置 `PLUGIN_MARKET` 追加仓库地址，多个地址用 `,` 分隔且**地址以 `/` 结尾**（`app/runtime/config.py:693-694`），例如 `https://github.com/LQFHUB/<仓库>/`。
+1. 本目录推送到 GitHub 插件仓库 `LQFHUB/moviepilot-plugins`（已就绪，`main` 分支）。
+2. 在 MoviePilot 系统设置 `PLUGIN_MARKET` 追加仓库地址，多个地址用 `,` 分隔且**地址以 `/` 结尾**（`app/runtime/config.py:693-694`），即追加 `https://github.com/LQFHUB/moviepilot-plugins/`。
 3. 在插件市场刷新，即可看到 `package.v3.json` 中的插件；安装会把源码复制到运行目录 `app/plugins/<id_lower>/`，改 `version` 后即为一次更新。
 4. ⚠️ 第 2 步会改动**运行中实例**的系统设置，执行前先说明并征得同意。
 
