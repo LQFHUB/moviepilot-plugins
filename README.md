@@ -14,12 +14,12 @@
 
 ## 当前内容
 
-### CloudSubscribe（网盘订阅助手）v1.6.6
+### PanBox（由「网盘订阅助手」改造）v1.6.6
 
-- **来源**：`odomu/MoviePilot-Plugins` 的原版插件（作者 **odomu**）。本仓库为其**个人副本**，用于自行改造。
+- **来源**：改写自 `odomu/MoviePilot-Plugins` 的「网盘订阅助手」（原作者 **odomu**）。插件 ID/类名/目录已改为 `PanBox`，因此与市场里的第三方 `CloudSubscribe` **互不冲突、可并存**。
 - **许可证**：**GPL-3.0**（见 `LICENSE`）；本副本沿用同一许可证，改造后分发需继续遵守 GPL-3.0。
-- **代际**：V2 布局（`plugins.v2/cloudsubscribe/`），在 V3 宿主上经宿主的向后兼容路径加载（已实测可用）。
-- **前端产物**：`plugins.v2/cloudsubscribe/dist/assets/`（由 `frontend/cloudsubscribe` 构建后提交，因此索引里 `release: false`，不走 Release 分发）。
+- **代际**：V2 布局（`plugins.v2/panbox/`），在 V3 宿主上经宿主的向后兼容路径加载（已实测可用）。
+- **前端产物**：`plugins.v2/panbox/dist/assets/`（由 `frontend/cloudsubscribe` 构建后提交，因此索引里 `release: false`，不走 Release 分发）。
 - **重新构建前端**：
 
   ```bash

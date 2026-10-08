@@ -6,7 +6,7 @@ import {fileURLToPath} from "node:url";
 
 const outputDir = resolve(
     fileURLToPath(new URL(".", import.meta.url)),
-    "../../plugins.v2/cloudsubscribe/dist/assets",
+    "../../plugins.v2/panbox/dist/assets",
 );
 
 export default defineConfig({
@@ -14,7 +14,7 @@ export default defineConfig({
     plugins: [
         vue(),
         federation({
-            name: "cloudsubscribe",
+            name: "PanBox",
             filename: "remoteEntry.js",
             exposes: {
                 "./Page": "./src/components/Page.vue",

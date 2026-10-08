@@ -90,11 +90,11 @@ _COMPONENT_TYPES = (
 )
 
 
-class CloudSubscribe(_PluginBase):
+class PanBox(_PluginBase):
     """网盘订阅助手插件。"""
 
     # 插件名称
-    plugin_name = "网盘订阅助手"
+    plugin_name = "PanBox"
     # 插件描述
     plugin_desc = "整合网盘能力与多渠道资源搜索，自动查找并补充订阅缺失的影视内容。"
     # 插件图标
