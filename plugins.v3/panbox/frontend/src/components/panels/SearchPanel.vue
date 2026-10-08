@@ -27,7 +27,7 @@ const props = defineProps({
 const emit = defineEmits(['meta', 'stats'])
 
 const client = createPanBoxApi(props.api)
-const { busyCount, isBusy, transfer, favorite, snackbar, toast } = useResourceActions(props.api)
+const { busyCount, isBusy, transfer, favorite, visible, text, color, toast } = useResourceActions(props.api)
 
 const keyword = ref('')
 const selectedChannels = ref([])
@@ -225,8 +225,8 @@ function onFavorite(item) {
       输入关键词后点击「搜索」。留空关键词可直接拉取频道最新资源。
     </v-alert>
 
-    <v-snackbar v-model="snackbar.visible" :color="snackbar.color" timeout="3000" location="top">
-      {{ snackbar.text }}
+    <v-snackbar v-model="visible" :color="color" timeout="3000" location="top">
+      {{ text }}
     </v-snackbar>
   </div>
 </template>

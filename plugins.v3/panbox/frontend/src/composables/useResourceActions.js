@@ -123,6 +123,11 @@ export function useResourceActions(api) {
     transfer,
     favorite,
     toast,
-    snackbar: { visible, text, color },
+    // 注意：这里必须把 ref 平铺返回。模板里 `snackbar.visible` 这种「普通对象包 ref」
+    // 的写法不会被自动解包（自动解包只作用于 setup 顶层绑定），会导致提示条完全不显示，
+    // 因此统一由使用方在顶层解构这些 ref。
+    visible,
+    text,
+    color,
   }
 }

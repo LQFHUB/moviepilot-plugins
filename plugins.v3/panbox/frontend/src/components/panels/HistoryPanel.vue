@@ -22,7 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['changed'])
 
 const client = createPanBoxApi(props.api)
-const { busyCount, isBusy, transfer, favorite, snackbar, toast } = useResourceActions(props.api)
+const { busyCount, isBusy, transfer, favorite, visible, text, color, toast } = useResourceActions(props.api)
 
 const loading = ref(false)
 const errorText = ref('')
@@ -291,8 +291,8 @@ onMounted(() => {
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snackbar.visible" :color="snackbar.color" timeout="3000" location="top">
-      {{ snackbar.text }}
+    <v-snackbar v-model="visible" :color="color" timeout="3000" location="top">
+      {{ text }}
     </v-snackbar>
   </div>
 </template>

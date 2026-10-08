@@ -19,7 +19,7 @@ const props = defineProps({
 const emit = defineEmits(['changed'])
 
 const client = createPanBoxApi(props.api)
-const { busyCount, isBusy, transfer, snackbar, toast } = useResourceActions(props.api)
+const { busyCount, isBusy, transfer, visible, text, color, toast } = useResourceActions(props.api)
 
 const loading = ref(false)
 const errorText = ref('')
@@ -129,8 +129,8 @@ defineExpose({ load })
       还没有收藏。在搜索结果里点击「收藏」即可把资源固定到这里。
     </v-alert>
 
-    <v-snackbar v-model="snackbar.visible" :color="snackbar.color" timeout="3000" location="top">
-      {{ snackbar.text }}
+    <v-snackbar v-model="visible" :color="color" timeout="3000" location="top">
+      {{ text }}
     </v-snackbar>
   </div>
 </template>
