@@ -97,7 +97,7 @@ def create_platform_ttl_cache(
     identity_text = _cache_identity(identity)
     suffix = sha256(identity_text.encode("utf-8")).hexdigest()[:16]
     return _PlatformTTLCache(
-        region=f"cloudsubscribe:{str(namespace).strip(':')}:{suffix}",
+        region=f"panbox:{str(namespace).strip(':')}:{suffix}",
         maxsize=max(1, int(maxsize or 1)),
         ttl=max(1, int(ttl or 1)),
     )

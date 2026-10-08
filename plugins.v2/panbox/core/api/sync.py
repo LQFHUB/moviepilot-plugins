@@ -610,7 +610,7 @@ class SyncApi(OwnerDelegator):
         if magnet_links:
             with ThreadPoolExecutor(
                     max_workers=min(3, len(magnet_links)),
-                    thread_name_prefix="cloudsubscribe-magnet-metadata",
+                    thread_name_prefix="panbox-magnet-metadata",
             ) as executor:
                 results = executor.map(
                     lambda value: offline_download.parse_magnet_link(

@@ -20,7 +20,7 @@ def main() -> None:
         default=(
                 settings.PLUGIN_DATA_PATH
                 / "PanBox"
-                / "cloudsubscribe.db"
+                / "panbox.db"
         ),
         help="用于比较旧结构的 SQLite 数据库路径",
     )

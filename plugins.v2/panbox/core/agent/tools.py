@@ -31,7 +31,7 @@ def _plugin():
 
 
 class PanBoxStatusTool(MoviePilotTool):
-    name: str = "cloudsubscribe_status"
+    name: str = "panbox_status"
     tags: list[str] = [ToolTag.Read, ToolTag.Plugin, ToolTag.Subscription]
     description: str = (
         "查询网盘助手的运行状态、任务进度、转存汇总、缓存占用、网盘能力和最近记录。"
@@ -55,7 +55,7 @@ class PanBoxStatusTool(MoviePilotTool):
 
 
 class PanBoxSyncTool(MoviePilotTool):
-    name: str = "cloudsubscribe_start_sync"
+    name: str = "panbox_start_sync"
     tags: list[str] = [ToolTag.Write, ToolTag.Subscription, ToolTag.Plugin]
     description: str = (
         "启动一次网盘订阅同步搜索。仅在用户明确要求立即搜索、追更或同步订阅时使用；"
@@ -75,7 +75,7 @@ class PanBoxSyncTool(MoviePilotTool):
 
 
 class PanBoxLinksTool(MoviePilotTool):
-    name: str = "cloudsubscribe_process_links"
+    name: str = "panbox_process_links"
     tags: list[str] = [
         ToolTag.Write,
         ToolTag.Resource,
@@ -87,7 +87,7 @@ class PanBoxLinksTool(MoviePilotTool):
         "优先定位唯一匹配订阅；没有订阅时使用媒体名称快速识别 TMDB；只有一个候选会直接进入完整转存流程，多个候选会"
         "返回 selection_id，此时应让用户选择媒体类型和 TMDB ID 后再次调用本工具。"
         "仅处理用户明确提供的链接；"
-        "搜索工具返回的候选必须改用 cloudsubscribe_select_resources，禁止复制或改写候选链接。"
+        "搜索工具返回的候选必须改用 panbox_select_resources，禁止复制或改写候选链接。"
     )
     args_schema: Type[BaseModel] = PanBoxLinksInput
 
@@ -135,7 +135,7 @@ class PanBoxLinksTool(MoviePilotTool):
 
 
 class PanBoxCheckinTool(MoviePilotTool):
-    name: str = "cloudsubscribe_checkin"
+    name: str = "panbox_checkin"
     tags: list[str] = [ToolTag.Write, ToolTag.Plugin]
     description: str = (
         "立即执行网盘助手签到。可指定渠道，省略时签到全部已启用渠道。"
@@ -165,7 +165,7 @@ class PanBoxCheckinTool(MoviePilotTool):
 
 
 class PanBoxCheckinHistoryTool(MoviePilotTool):
-    name: str = "cloudsubscribe_checkin_history"
+    name: str = "panbox_checkin_history"
     tags: list[str] = [ToolTag.Read, ToolTag.Plugin]
     description: str = (
         "按渠道列举网盘助手的签到详情，包括执行时间、状态、模式、积分变化、"
@@ -195,7 +195,7 @@ class PanBoxCheckinHistoryTool(MoviePilotTool):
 
 
 class PanBoxResourceSearchTool(MoviePilotTool):
-    name: str = "cloudsubscribe_search_resources"
+    name: str = "panbox_search_resources"
     sends_message: bool = True
     return_direct: bool = True
     tags: list[str] = [
@@ -211,7 +211,7 @@ class PanBoxResourceSearchTool(MoviePilotTool):
         "用户只提供媒体名称时直接调用本工具，不要先查询全部订阅。必须先调用本工具"
         "再做AI筛选或推荐，并使用中文展示候选和解释推荐理由。"
         "用户要手动选择时，支持按钮的渠道应调用 ask_user_choice，按钮值保留候选ID，"
-        "收到选择后使用本工具返回的 search_id 调用 cloudsubscribe_select_resources。"
+        "收到选择后使用本工具返回的 search_id 调用 panbox_select_resources。"
         "未关联现有订阅的搜索只能展示和推荐，不能直接转存。"
     )
     args_schema: Type[BaseModel] = PanBoxResourceSearchInput
@@ -306,12 +306,12 @@ class PanBoxResourceSearchTool(MoviePilotTool):
             title="网盘资源搜索",
         )
         self._agent_context["user_reply_sent"] = True
-        self._agent_context["reply_mode"] = "cloudsubscribe_search"
+        self._agent_context["reply_mode"] = "panbox_search"
         return json.dumps(result, ensure_ascii=False, indent=2, default=str)
 
 
 class PanBoxResourceSelectTool(MoviePilotTool):
-    name: str = "cloudsubscribe_select_resources"
+    name: str = "panbox_select_resources"
     tags: list[str] = [
         ToolTag.Write,
         ToolTag.Resource,
@@ -319,7 +319,7 @@ class PanBoxResourceSelectTool(MoviePilotTool):
         ToolTag.Transfer,
     ]
     description: str = (
-        "提交用户已确认的网盘候选资源。只能使用 cloudsubscribe_search_resources 最近一次"
+        "提交用户已确认的网盘候选资源。只能使用 panbox_search_resources 最近一次"
         "搜索返回的 search_id 和候选ID，不能接收或构造原始链接。AI推荐后必须等待用户明确确认；"
         "搜索未关联现有订阅时不能提交，需先创建或选择订阅后重新搜索。"
         "若用户要求手动选择，先使用 ask_user_choice，收到选择结果后再调用本工具。"
@@ -350,7 +350,7 @@ class PanBoxResourceSelectTool(MoviePilotTool):
 
 
 class PanBoxCacheClearTool(MoviePilotTool):
-    name: str = "cloudsubscribe_clear_cache"
+    name: str = "panbox_clear_cache"
     tags: list[str] = [ToolTag.Write, ToolTag.Admin, ToolTag.Plugin, ToolTag.System]
     description: str = (
         "清理网盘助手的搜索、候选资源、网盘分享和路径等运行缓存。"
@@ -373,7 +373,7 @@ class PanBoxCacheClearTool(MoviePilotTool):
 
 
 class PanBoxPerformanceTool(MoviePilotTool):
-    name: str = "cloudsubscribe_performance"
+    name: str = "panbox_performance"
     tags: list[str] = [ToolTag.Read, ToolTag.Plugin, ToolTag.System]
     description: str = (
         "查询网盘助手当前任务的排队时间、运行耗时、进度、转存吞吐、"
@@ -394,7 +394,7 @@ class PanBoxPerformanceTool(MoviePilotTool):
 
 
 class PanBoxConfigUpdateTool(MoviePilotTool):
-    name: str = "cloudsubscribe_update_config"
+    name: str = "panbox_update_config"
     tags: list[str] = [ToolTag.Write, ToolTag.Admin, ToolTag.Plugin, ToolTag.Settings]
     description: str = (
         "修改网盘助手允许智能体调整的非敏感配置，包括侧栏、智能体开关、通知、"

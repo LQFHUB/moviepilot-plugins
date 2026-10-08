@@ -259,7 +259,7 @@ class HttpFileDownloadService:
 
         executor = ThreadPoolExecutor(
             max_workers=worker_count,
-            thread_name_prefix="cloudsubscribe-range-download",
+            thread_name_prefix="panbox-range-download",
         )
         futures = [executor.submit(download_part, value) for value in pending_ranges]
         try:
@@ -880,7 +880,7 @@ class CrossTransferTaskManager:
         )
         download_thread = Thread(
             target=run_download,
-            name="cloudsubscribe-progressive-download",
+            name="panbox-progressive-download",
             daemon=True,
         )
         download_thread.start()

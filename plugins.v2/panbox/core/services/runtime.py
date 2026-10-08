@@ -97,7 +97,7 @@ class SyncRuntimeService(OwnerDelegator):
         for subscribe in subscribes:
             is_tv = getattr(subscribe, "type", "") == MediaType.TV.value
             preparation = getattr(
-                subscribe, "_cloudsubscribe_preparation", {}
+                subscribe, "_panbox_preparation", {}
             ) or {}
             task_id = self._sync_task_id(subscribe)
             tasks[task_id] = {
@@ -982,7 +982,7 @@ class SyncRuntimeService(OwnerDelegator):
                     target=self._finish_postprocessing_stop,
                     args=(task_id, task_snapshot),
                     daemon=True,
-                    name="cloudsubscribe-safe-postprocess-stop",
+                    name="panbox-safe-postprocess-stop",
                 ).start()
             except Exception as error:
                 with self._sync_tasks_lock:
@@ -1151,7 +1151,7 @@ class SyncRuntimeService(OwnerDelegator):
         totals = {"checked": 0, "completed": 0, "failed": 0, "pending": 0}
         with ThreadPoolExecutor(
                 max_workers=worker_count,
-                thread_name_prefix="cloudsubscribe-offline",
+                thread_name_prefix="panbox-offline",
         ) as executor:
             futures = {
                 executor.submit(

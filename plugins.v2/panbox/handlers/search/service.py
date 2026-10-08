@@ -945,7 +945,7 @@ class SearchHandler:
         workers = min(max(1, self._search_concurrency), len(ordered_sources))
         executor = ThreadPoolExecutor(
             max_workers=workers,
-            thread_name_prefix="cloudsubscribe-search",
+            thread_name_prefix="panbox-search",
         )
         stopped = False
         futures = {}

@@ -191,7 +191,7 @@ class PluginEventHandler(OwnerDelegator):
             target=self._sync_handler.process_pt_upgrade,
             args=(dict(event_data),),
             daemon=True,
-            name="cloudsubscribe-pt-upgrade",
+            name="panbox-pt-upgrade",
         ).start()
 
     @staticmethod
@@ -559,7 +559,7 @@ class PluginEventHandler(OwnerDelegator):
                 "tmdb_id": int(parts[3]),
             },
             daemon=True,
-            name="cloudsubscribe-telegram-link-select",
+            name="panbox-telegram-link-select",
         ).start()
 
     def _run_remote_checkin(
@@ -662,10 +662,10 @@ class PluginEventHandler(OwnerDelegator):
             return
         event_data = event.event_data or {}
         action = str(event_data.get("action") or "")
-        if not action.startswith("cloudsubscribe_"):
+        if not action.startswith("panbox_"):
             return
 
-        if action == "cloudsubscribe_status":
+        if action == "panbox_status":
             overview = self.get_platform_overview(0)
             stats = {item["title"]: item["value"] for item in overview["stats"]}
             runtime = overview["runtime"]
@@ -681,7 +681,7 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_sync":
+        if action == "panbox_sync":
             result = self.start_platform_sync()
             self._post_command_message(
                 event_data,
@@ -690,16 +690,16 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_auto_subscribe":
+        if action == "panbox_auto_subscribe":
             Thread(
                 target=self._run_remote_auto_subscribe,
                 args=(dict(event_data),),
                 daemon=True,
-                name="cloudsubscribe-command-auto-subscribe",
+                name="panbox-command-auto-subscribe",
             ).start()
             return
 
-        if action == "cloudsubscribe_links":
+        if action == "panbox_links":
             raw = str(event_data.get("arg_str") or "").strip()
             links = self.extract_resource_links(raw)
             if not links:
@@ -724,7 +724,7 @@ class PluginEventHandler(OwnerDelegator):
                     "title": title,
                 },
                 daemon=True,
-                name="cloudsubscribe-command-links",
+                name="panbox-command-links",
             ).start()
             self._post_command_message(
                 event_data,
@@ -733,7 +733,7 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_link_select":
+        if action == "panbox_link_select":
             args = str(event_data.get("arg_str") or "").strip().split()
             selection_type, separator, tmdb_text = (
                 args[1].lower().partition(":") if len(args) == 2 else ("", "", "")
@@ -759,7 +759,7 @@ class PluginEventHandler(OwnerDelegator):
                     "tmdb_id": int(tmdb_text),
                 },
                 daemon=True,
-                name="cloudsubscribe-command-link-select",
+                name="panbox-command-link-select",
             ).start()
             self._post_command_message(
                 event_data,
@@ -768,7 +768,7 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_checkin":
+        if action == "panbox_checkin":
             args = str(event_data.get("arg_str") or "").strip().lower().split()
             mode_aliases = {
                 "normal": "normal", "普通": "normal",
@@ -793,7 +793,7 @@ class PluginEventHandler(OwnerDelegator):
                 target=self._run_remote_checkin,
                 args=(dict(event_data), provider, mode),
                 daemon=True,
-                name="cloudsubscribe-command-checkin",
+                name="panbox-command-checkin",
             ).start()
             self._post_command_message(
                 event_data,
@@ -802,7 +802,7 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_checkin_history":
+        if action == "panbox_checkin_history":
             args = str(event_data.get("arg_str") or "").strip().lower().split()
             if len(args) > 2:
                 self._post_command_message(
@@ -833,7 +833,7 @@ class PluginEventHandler(OwnerDelegator):
             )
             return
 
-        if action == "cloudsubscribe_cache_clear":
+        if action == "panbox_cache_clear":
             result = self.api_vue_clear_cache()
             self._post_command_message(
                 event_data,

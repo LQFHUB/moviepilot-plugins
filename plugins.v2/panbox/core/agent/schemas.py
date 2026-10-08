@@ -124,7 +124,7 @@ class PanBoxResourceSelectInput(BaseModel):
         ...,
         min_length=1,
         max_length=32,
-        description="cloudsubscribe_search_resources 返回的搜索 ID",
+        description="panbox_search_resources 返回的搜索 ID",
     )
     candidate_ids: List[str] = Field(
         ...,

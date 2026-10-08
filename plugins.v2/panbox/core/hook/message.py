@@ -67,7 +67,7 @@ class MessageRoutingHook(OwnerDelegator):
                 target=self.handle_telegram_links,
                 args=(payload,),
                 daemon=True,
-                name="cloudsubscribe-telegram-links",
+                name="panbox-telegram-links",
             ).start()
         except Exception as error:
             logger.error(f"平台资源链接处理线程启动失败：{error}")

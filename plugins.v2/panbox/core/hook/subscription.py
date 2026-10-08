@@ -101,11 +101,11 @@ class SubscriptionSearchHook(OwnerDelegator):
                 if not callable(current):
                     logger.warning(f"搜索入口不存在：SearchChain.{method_name}")
                     continue
-                if getattr(current, "__cloudsubscribe_owner__", None) is self:
+                if getattr(current, "__panbox_owner__", None) is self:
                     continue
 
                 original = getattr(
-                    current, "__cloudsubscribe_original__", current
+                    current, "__panbox_original__", current
                 )
                 self._platform_search_originals.setdefault(method_name, original)
                 wrapper = self._create_platform_search_wrapper(
@@ -132,7 +132,7 @@ class SubscriptionSearchHook(OwnerDelegator):
 
             for method_name, original in originals.items():
                 current = getattr(SearchChain, method_name, None)
-                if getattr(current, "__cloudsubscribe_owner__", None) is self:
+                if getattr(current, "__panbox_owner__", None) is self:
                     setattr(SearchChain, method_name, original)
         except Exception as error:
             logger.warning(f"恢复平台搜索入口失败：{error}")
@@ -181,8 +181,8 @@ class SubscriptionSearchHook(OwnerDelegator):
 
             wrapper = sync_wrapper
 
-        wrapper.__cloudsubscribe_owner__ = self
-        wrapper.__cloudsubscribe_original__ = original
+        wrapper.__panbox_owner__ = self
+        wrapper.__panbox_original__ = original
         return wrapper
 
     def _is_platform_search_blocked(self) -> bool:
@@ -200,11 +200,11 @@ class SubscriptionSearchHook(OwnerDelegator):
             current = getattr(SubscribeChain, method_name, None)
             if not callable(current):
                 return
-            if getattr(current, "__cloudsubscribe_owner__", None) is self:
+            if getattr(current, "__panbox_owner__", None) is self:
                 return
 
             original = getattr(
-                current, "__cloudsubscribe_original__", current
+                current, "__panbox_original__", current
             )
             originals = getattr(self, "_subscribe_chain_originals", None)
             if originals is not None:
@@ -228,7 +228,7 @@ class SubscriptionSearchHook(OwnerDelegator):
 
             for method_name, original in originals.items():
                 current = getattr(SubscribeChain, method_name, None)
-                if getattr(current, "__cloudsubscribe_owner__", None) is self:
+                if getattr(current, "__panbox_owner__", None) is self:
                     setattr(SubscribeChain, method_name, original)
         except Exception as error:
             logger.warning(f"恢复订阅执行接管器失败：{error}")
@@ -262,8 +262,8 @@ class SubscriptionSearchHook(OwnerDelegator):
                 **kwargs,
             )
 
-        process_search_subscription_wrapper.__cloudsubscribe_owner__ = self
-        process_search_subscription_wrapper.__cloudsubscribe_original__ = original
+        process_search_subscription_wrapper.__panbox_owner__ = self
+        process_search_subscription_wrapper.__panbox_original__ = original
         return process_search_subscription_wrapper
 
     def _dispatch_process_search_subscription(

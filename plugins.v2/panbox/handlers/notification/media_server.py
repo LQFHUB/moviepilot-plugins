@@ -158,7 +158,7 @@ class MediaServerResolver:
                 if missing:
                     with ThreadPoolExecutor(
                             max_workers=min(6, len(missing)),
-                            thread_name_prefix="cloudsubscribe-media-baseline",
+                            thread_name_prefix="panbox-media-baseline",
                     ) as executor:
                         media_items = executor.map(
                             lambda value: (
@@ -317,11 +317,11 @@ class MediaServerNotifier:
         self._task_batch_depth = 0
         self._closed = False
         self._batch_executor = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="cloudsubscribe-media-batch"
+            max_workers=1, thread_name_prefix="panbox-media-batch"
         )
         self._refresh_executor = ThreadPoolExecutor(
             max_workers=max(1, min(len(self.mediaservers) or 1, 4)),
-            thread_name_prefix="cloudsubscribe-media-refresh",
+            thread_name_prefix="panbox-media-refresh",
         )
         self._emby_refresh_recent: Dict[str, float] = {}
         self._mediainfo_timers: Dict[str, Timer] = {}

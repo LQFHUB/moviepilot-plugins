@@ -186,40 +186,22 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
 
 ## 10. 插件登记表（本仓库开发的插件）
 
-**本表只登记本仓库将要/正在开发的插件**，不登记运行实例上已安装的第三方插件。新增、改名、升级、下线插件时，必须同步更新本表与 `package.v3.json`。
+**本表只登记本仓库将要/正在开发的插件**，不登记运行实例上已安装的第三方插件。新增、改名、升级、下线插件时，必须同步更新本表。
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| ~~`PanBox`~~ | ~~`plugins.v3/panbox`~~ | ~~网盘助手~~ | 0.2.3 | vue 联邦 | **已下线（2026-10-08 按用户要求移除，源码见 git 历史 `98dcc7c`）** | 自建 TG 频道资源搜索 + 转存 + 账号管理 + 历史/收藏 + 侧栏整页 |
-| `PanBox` | `plugins.v2/panbox` | 网盘助手 | 1.6.6 | vue 联邦 | **已入库（改造版，待继续开发）** | 改写自 `odomu/MoviePilot-Plugins` 的网盘订阅插件（**GPL-3.0**，保留 LICENSE 与署名）；ID/类名/目录均为 `PanBox`，与市场第三方 `CloudSubscribe` **并存不冲突**；V2 布局，前端产物已构建提交，`release: false` |
+| `PanBox` | `plugins.v2/panbox` | 网盘助手 | 1.6.6 | vue 联邦 | 改造中 | 网盘订阅派生版：网盘订阅、多网盘转存、多渠道资源搜索、签到、历史；V2 布局在 V3 宿主上走向后兼容加载；前端产物已构建并提交 |
 
-`PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
-- **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
-- **本仓库许可证：暂不加**（版权保留）。若日后复用 GPL-3.0 项目代码，PanBox 须整体以 GPL-3.0 发布。
-- **侧栏架构（v0.2.0 起，复用宿主菜单分组）**：`resource`→`section=discovery`（落在「探索」分组，`AppPageResource`：豆瓣/TMDB 双榜单 + 海报网格 + 详情频道页签）；`movie`/`tv`→`section=subscribe`（落在「订阅」分组，`AppPageMovie`/`AppPageTv`，仿宿主「订阅→电影/电视剧」）；`main`→`section=system`（管理页）。宿主前端按 `./AppPage{PascalCase(nav_key)}` 解析非 main 页，故 `vite.config.js` 需逐个 expose。
-- **榜单实现**：复用宿主链 `DoubanChain.async_douban_discover` / `TmdbChain.async_tmdb_discover`（与宿主「探索」页同源同参）；媒体搜索用 `MediaChain.async_search_medias`。榜单参数为实例实测可用值（豆瓣 sort=R/T/S、tags=豆瓣高分；TMDB sort_by=popularity.desc / vote_average.desc + vote_count）。
-- **订阅实现（全自动）**：订阅存宿主 KV 键 `subscriptions`；`get_service()` 注册 cron 服务（`CronTrigger.from_crontab(auto_sync_cron)`，仅在 `auto_sync_enabled` + 115 已启用时注册）；同步流程为「频道搜索 → 网盘类型/季号/关键词/体积筛选 → 优选 → 转存 → 记录」，体积取自 115 `share/snap` 真实解析，`transferred`/`seen` 双去重。
-- **搜索实现**：自建抓取 `https://t.me/s/<频道>?q=<关键词>` 公开预览页，用宿主自带的 beautifulsoup4 解析；频道列表由插件配置（默认 5 个）。已实测：真实频道能命中并解析出网盘链接与提取码。Telegram 站内搜索为模糊匹配，需按 `search_filter` 做后置过滤。
-- **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
-- **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
-- **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（17 项测试，已通过）；`cd plugins.v3/panbox/frontend && npm run build`（构建末尾自动校验 `dist/assets` 产物完整性）。
-- **实例联调结果（2026-10-08，已在 `192.168.31.200:3000` 安装并启用；当前 v0.1.2）**：
-  - ✅ 已安装（`has_page=True`、`runtime_compatible=True`），已启用；宿主侧栏 `sidebar_nav` 唯一入口即 PanBox（`nav_key=main`、`section=system`、`permission=manage`）。
-  - ✅ 联邦组件已注册：`/plugin/file/panbox/dist/assets/remoteEntry.js?v=<版本>`，与本地构建产物 sha256 **一致**；entry 引用的 10 个 js/css 由实例返回 **全部 200**。
-  - ✅ 浏览器实测（真实宿主前端 v3.1.2，admin 登录）：侧栏「网盘助手」→ `#/plugin-app/PanBox/main` 正常渲染；四个页签（搜索/历史/收藏/账号）均正常；插件卡片详情对话框（`Page.vue`）正常；插件市场列表卡片显示名称/版本/描述/作者。
-  - ✅ **配置面板已在宿主 UI 中打开验证**（路径：`#/plugins` → PanBox 卡片菜单 → Settings）：分组导航（插件运行 / 网盘与数据）、四个分类、状态 chips、统计与底栏均按设计渲染，跟随宿主主题。
-  - ✅ UI 内真实搜索成功：关键词「流浪地球」跨 5 频道返回 **19 条 / 9261ms**，卡片正确显示频道、时间、网盘类型、提取码、复制/收藏/原消息链接。
-  - ✅ 失败路径有可读提示：点击「转存到115」弹出 snackbar「115 网盘未启用（请在插件配置中开启）」。
-  - ✅ API 层：`meta`/`search`/`history`/`favorites`/`drive.*` 均符合预期；零凭证泄露（提交内容与前端代码均未含 Token）。
-  - ✅ **四入口侧栏已在真机验证**：`sidebar_nav` 返回 4 项且分组正确（`resource`→discovery、`movie`/`tv`→subscribe、`main`→system）；宿主前端按 `./AppPage{PascalCase(nav_key)}` 成功加载 `#/plugin-app/PanBox/resource` 与 `.../movie`（`AppPageResource`/`AppPageMovie` 均在页内渲染）。
-  - ✅ **网盘资源页（复用探索榜单）已在真机验证**：4 个榜单页签（豆瓣电影/剧集、TMDB 电影/剧集）+ 排序 + 海报网格 30 张；榜单数据来自宿主 `DoubanChain`/`TmdbChain`。
-  - ✅ **豆瓣海报 418 防盗链已修复**：海报统一改走宿主同源图片代理 `GET /api/v1/system/img/false?imgurl=<url>`（需登录 Cookie 携带 resource token）；修复后 30/30 张加载成功，控制台错误由 33 条降至 1 条（仅宿主自身 Google Fonts）。
-  - ✅ **115 读接口已用真实 Cookie 验证**：`/drive/check` 返回「115 Cookie 可用」；`/drive/folders` 能列出根目录与配置的目标目录（真实网盘内容，100 个子目录）；`/drive/preview` 能解析真实分享（含体积，实测一条 106GB Remux），并能把 115 的真实错误（如「分享已取消」）转为可读提示。
-- **尚未验证（勿当作已可用）**：
-  1. **115 写入（`share/receive`）仍未实测**——需要一条体积可接受的 115 分享（现有搜索到的资源均为 20GB~180GB，未擅自写入用户网盘）；
-  2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，自动转存仅 115；
-  3. **订阅链路的「自动转存」尚未在实例跑通**（订阅增删、`/subscriptions/run` 接口与 cron 服务注册已就绪，但真实自动转存依赖 `share/receive` 写入，见第 1 条）。
-- **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积；**不提供网络代理设置**（实测容器可直连 `t.me`，豆瓣图片走宿主同源图片代理 `/api/v1/system/img/false?imgurl=`，无需代理）。
+`PanBox` 详情（完整信息见 `plugins.v2/panbox/README.md`）：
+
+- **来源与许可**：改写自第三方 GPL-3.0 的网盘订阅类插件；已做**彻底去残留**——类名、目录、索引键、调度 job 名、数据库文件名、**前端硬编码的接口路径**全部改为 `PanBox` / `panbox`，无上游标识。仓库当前**未附许可证文件**；因代码源自 GPL-3.0，对外分发需自行补齐许可与署名。
+- **作者与图标**：`plugin_author = LQFHUB`、`author_url` 与 `plugin_icon` 均指向本仓库（`icons/panbox.png`）。
+- **改名带来的两点适配（后续改造别再踩）**：
+  1. 插件配置按**插件 ID 命名空间**存放（`<插件ID>_*`），改 ID 会读到**默认空配置**——本次已用备份回写恢复（319 键）；
+  2. 插件自有 SQLite 路径随插件 ID 变化（`<配置目录>/plugins/<插件ID>/panbox.db`），改 ID 后**网盘账号需要重填**（账号只存在该库里，不在宿主配置中）。
+- **前端**：源码在 `frontend/panbox/`，构建输出固定为 `plugins.v2/panbox/dist/assets`（vite `outDir` 已指向此处）。**改了前端必须重新构建并提交**——索引条目 `release: false`，宿主不会替插件构建。
+- **更新流程**：改代码 →（若动前端）`cd frontend/panbox && npm install && npm run build` → 改 `package.v2.json` 的 `version` → `git push` → 市场刷新（`force=true`）→ 安装/更新。
+- **本地校验注意**：`core/api/search.py` 用了 Python 3.12+ 才支持的 f-string 写法（宿主是 3.14，运行正常）；本地 `compileall` 需用 3.12+ 才不误报。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
 

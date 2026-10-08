@@ -41,7 +41,7 @@ class SyncExecutionService(OwnerDelegator):
         if is_dead:
             executor = ThreadPoolExecutor(
                 max_workers=1,
-                thread_name_prefix="cloudsubscribe-sync-operation",
+                thread_name_prefix="panbox-sync-operation",
             )
             self._sync_operation_executor = executor
         return executor
@@ -216,7 +216,7 @@ class SyncExecutionService(OwnerDelegator):
                 "all_targets_future": False,
                 "defer_until": "",
             }
-            setattr(subscribe, "_cloudsubscribe_preparation", preparation)
+            setattr(subscribe, "_panbox_preparation", preparation)
             return subscribe
 
         prepared = []
@@ -233,7 +233,7 @@ class SyncExecutionService(OwnerDelegator):
             worker_count = min(8, len(subscribes))
             with ThreadPoolExecutor(
                 max_workers=worker_count,
-                thread_name_prefix="cloudsubscribe-prep"
+                thread_name_prefix="panbox-prep"
             ) as executor:
                 results = list(executor.map(_prepare_one, subscribes))
             for res in results:
@@ -379,7 +379,7 @@ class SyncExecutionService(OwnerDelegator):
             Thread(
                 target=self._drain_subscribe_search_queue,
                 daemon=True,
-                name="cloudsubscribe-search-queue",
+                name="panbox-search-queue",
             ).start()
         return True
 
@@ -460,7 +460,7 @@ class SyncExecutionService(OwnerDelegator):
                 Thread(
                     target=self._drain_subscribe_search_queue,
                     daemon=True,
-                    name="cloudsubscribe-search-queue",
+                    name="panbox-search-queue",
                 ).start()
 
     def cancel_pending_subscribe_searches(self, shutdown: bool = False) -> None:
@@ -735,7 +735,7 @@ class SyncExecutionService(OwnerDelegator):
                 )
             for subscribe in prepared:
                 preparation = getattr(
-                    subscribe, "_cloudsubscribe_preparation", {}
+                    subscribe, "_panbox_preparation", {}
                 ) or {}
                 if preparation.get("all_targets_future"):
                     deferred_count += 1
@@ -834,7 +834,7 @@ class SyncExecutionService(OwnerDelegator):
             )
             executor = ThreadPoolExecutor(
                 max_workers=worker_count,
-                thread_name_prefix="cloudsubscribe-subscribe",
+                thread_name_prefix="panbox-subscribe",
             )
             stop_waiting = False
             try:

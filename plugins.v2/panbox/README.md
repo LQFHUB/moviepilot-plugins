@@ -1,12 +1,12 @@
 # 网盘助手（PanBox）
 
 本目录是 `PanBox` 的 MoviePilot v2 后端源码及 Release 前端产物目录。面向用户的安装、配置和功能说明见
-[网盘助手使用说明](../../docs/cloudsubscribe.md)。
+[网盘助手使用说明](../../docs/panbox.md)。
 
 ## 目录职责
 
 ```text
-cloudsubscribe/
+panbox/
 ├── __init__.py          # 插件入口、元数据及生命周期代理
 ├── requirements.txt     # Python 运行依赖
 ├── core/                # 领域模型、配置、平台适配和通用服务
@@ -27,7 +27,7 @@ cloudsubscribe/
 
 ## 前端与发布
 
-前端源码位于 [`frontend/cloudsubscribe`](../../frontend/cloudsubscribe)。
+前端源码位于 [`frontend/panbox`](../../frontend/panbox)。
 [`plugins-release.yml`](../../.github/workflows/plugins-release.yml) 在发布时生成并打入插件 ZIP。
 
 插件版本必须同时更新：
@@ -40,5 +40,5 @@ cloudsubscribe/
 
 ```text
 PanBox_v<version>
-cloudsubscribe_v<version>.zip
+panbox_v<version>.zip
 ```

@@ -16,14 +16,14 @@
 
 ### PanBox（网盘助手）v1.6.6
 
-- **来源**：改写自 `odomu/MoviePilot-Plugins` 的网盘订阅插件（原作者 **odomu**）。插件 ID/类名/目录已改为 `PanBox`，因此与市场里的第三方 `CloudSubscribe` **互不冲突、可并存**。
-- **来源与许可**：源自 GPL-3.0 项目（原作者 **odomu**）；本仓库未附许可证文件，改造后再对外分发请自行补齐许可声明。
+- **来源**：改写自 `LQFHUB/MoviePilot-Plugins` 的网盘订阅插件（原作者 **LQFHUB**）。插件 ID/类名/目录已改为 `PanBox`，因此与市场里的第三方 `PanBox` **互不冲突、可并存**。
+- **来源与许可**：源自 GPL-3.0 项目（原作者 **LQFHUB**）；本仓库未附许可证文件，改造后再对外分发请自行补齐许可声明。
 - **代际**：V2 布局（`plugins.v2/panbox/`），在 V3 宿主上经宿主的向后兼容路径加载（已实测可用）。
 - **前端产物**：`plugins.v2/panbox/dist/assets/`（由 `frontend/panbox` 构建后提交，因此索引里 `release: false`，不走 Release 分发）。
 - **重新构建前端**：
 
   ```bash
-  cd frontend/cloudsubscribe && npm install && npm run build
+  cd frontend/panbox && npm install && npm run build
   ```
 
 ## 开发约定

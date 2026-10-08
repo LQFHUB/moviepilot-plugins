@@ -98,15 +98,15 @@ class PanBox(_PluginBase):
     # 插件描述
     plugin_desc = "整合网盘能力与多渠道资源搜索，自动查找并补充订阅缺失的影视内容。"
     # 插件图标
-    plugin_icon = "https://raw.githubusercontent.com/odomu/MoviePilot-Plugins/main/icons/cloud.png"
+    plugin_icon = "https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/icons/panbox.png"
     # 插件版本
     plugin_version = "1.6.6"
     # 插件作者
-    plugin_author = "odomu"
+    plugin_author = "LQFHUB"
     # 作者主页
-    author_url = "https://github.com/odomu"
+    author_url = "https://github.com/LQFHUB"
     # 插件配置项ID前缀
-    plugin_config_prefix = "cloudsubscribe_"
+    plugin_config_prefix = "panbox_"
     plugin_order = 21
     auth_level = 1
 
@@ -267,10 +267,10 @@ class PanBox(_PluginBase):
             self._drive_manager._clients["115"] = value
 
     def _get_data_store(self) -> PanBoxDataStore:
-        store = self.__dict__.get("_cloudsubscribe_data_store")
+        store = self.__dict__.get("_panbox_data_store")
         if store is None:
             store = PanBoxDataStore(self)
-            self.__dict__["_cloudsubscribe_data_store"] = store
+            self.__dict__["_panbox_data_store"] = store
         return store
 
     def get_data(self, key: Optional[str] = None, plugin_id: Optional[str] = None) -> Any:
@@ -527,7 +527,7 @@ class PanBox(_PluginBase):
             self._subscribe_search_queue_revision = 0
             self._sync_operation_executor = ThreadPoolExecutor(
                 max_workers=1,
-                thread_name_prefix="cloudsubscribe-sync-operation",
+                thread_name_prefix="panbox-sync-operation",
             )
             self._subscribe_search_originals = {}
             self._subscribe_chain_originals = {}
@@ -540,7 +540,7 @@ class PanBox(_PluginBase):
             if self._sync_operation_executor is None:
                 self._sync_operation_executor = ThreadPoolExecutor(
                     max_workers=1,
-                    thread_name_prefix="cloudsubscribe-sync-operation",
+                    thread_name_prefix="panbox-sync-operation",
                 )
 
         if config:
@@ -991,7 +991,7 @@ class PanBox(_PluginBase):
             pass
 
         try:
-            store = self.__dict__.get("_cloudsubscribe_data_store")
+            store = self.__dict__.get("_panbox_data_store")
             if store:
                 store.close()
         except Exception as error:

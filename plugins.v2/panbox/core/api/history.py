@@ -217,6 +217,6 @@ class HistoryApi(OwnerDelegator):
             target=self.sync_subscribes,
             kwargs={"upgrade_request": upgrade_request},
             daemon=True,
-            name="cloudsubscribe-history-upgrade",
+            name="panbox-history-upgrade",
         ).start()
         return {"success": True, "message": message}

@@ -887,7 +887,7 @@ class SyncHandler:
                 outcomes: Dict[str, bool] = {}
                 executor = ThreadPoolExecutor(
                     max_workers=max(1, worker_count),
-                    thread_name_prefix="cloudsubscribe-file-download",
+                    thread_name_prefix="panbox-file-download",
                 )
                 futures = {
                     executor.submit(transfer_one, item): str(item["file"]["id"])

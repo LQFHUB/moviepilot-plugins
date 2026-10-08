@@ -274,7 +274,7 @@ class PiankuClient:
                 chunk = pending[offset:offset + workers]
                 with ThreadPoolExecutor(
                         max_workers=workers,
-                        thread_name_prefix="cloudsubscribe-pianku-resolve",
+                        thread_name_prefix="panbox-pianku-resolve",
                 ) as executor:
                     for target, link in zip(chunk, executor.map(
                             lambda href: self._fetch_link(href, material), chunk

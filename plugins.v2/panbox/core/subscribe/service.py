@@ -129,7 +129,7 @@ class AutoSubscribeService:
             logger.info(f"已启用 {len(provider_jobs)} 个榜单渠道，开始并发抓取")
             with ThreadPoolExecutor(
                     max_workers=len(provider_jobs),
-                    thread_name_prefix="cloudsubscribe-auto-subscribe",
+                    thread_name_prefix="panbox-auto-subscribe",
             ) as executor:
                 futures = {
                     executor.submit(

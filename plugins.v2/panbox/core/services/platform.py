@@ -589,7 +589,7 @@ class PlatformIntegrationService(OwnerDelegator):
                     "资源大小、更新时间和解锁成本说明推荐理由。"
                     + (
                         "用户需要手动选择时，优先调用 ask_user_choice 展示候选 ID；"
-                        "收到选择后使用 search_id 调用 cloudsubscribe_select_resources。"
+                        "收到选择后使用 search_id 调用 panbox_select_resources。"
                         if bound_subscribe_id else
                         "本次搜索未绑定现有订阅，只能展示和推荐；需要转存时先创建或选择订阅，"
                         "再使用订阅 ID 重新搜索。"
@@ -1342,13 +1342,13 @@ class PlatformIntegrationService(OwnerDelegator):
             except (TypeError, ValueError):
                 result = {"success": False, "message": "订阅 ID 参数格式错误"}
                 return False, self._set_workflow_output(
-                    context, "cloudsubscribe_sync", result
+                    context, "panbox_sync", result
                 )
             requested_ids = sorted(value for value in normalized_ids if value > 0)
             if not requested_ids:
                 result = {"success": False, "message": "请提供有效的订阅 ID"}
                 return False, self._set_workflow_output(
-                    context, "cloudsubscribe_sync", result
+                    context, "panbox_sync", result
                 )
             with SessionFactory() as db:
                 existing_ids = {
@@ -1365,7 +1365,7 @@ class PlatformIntegrationService(OwnerDelegator):
                     "message": f"订阅不存在：{', '.join(map(str, missing_ids))}",
                 }
                 return False, self._set_workflow_output(
-                    context, "cloudsubscribe_sync", result
+                    context, "panbox_sync", result
                 )
         result: Dict[str, Any] = {}
         self.sync_subscribes(
@@ -1386,7 +1386,7 @@ class PlatformIntegrationService(OwnerDelegator):
         })
         result["data"] = data
         return bool(result.get("success")), self._set_workflow_output(
-            context, "cloudsubscribe_sync", result
+            context, "panbox_sync", result
         )
 
     def workflow_process_links(
@@ -1430,5 +1430,5 @@ class PlatformIntegrationService(OwnerDelegator):
             selection_scope="workflow",
         )
         return bool(result.get("success")), self._set_workflow_output(
-            context, "cloudsubscribe_links", result
+            context, "panbox_links", result
         )

@@ -207,7 +207,7 @@ class PlatformHistoryService(OwnerDelegator):
                     desired_sources = {entry["src"] for entry in entries}
                     if reconcile:
                         managed = db.query(TransferHistory).filter(or_(
-                            TransferHistory.src.like("cloudsubscribe://%"),
+                            TransferHistory.src.like("panbox://%"),
                             TransferHistory.downloader == "网盘助手",
                         )).all()
                         existing_by_src = {item.src: item for item in managed}
@@ -314,7 +314,7 @@ class PlatformHistoryService(OwnerDelegator):
             try:
                 with SessionFactory() as db:
                     query = db.query(TransferHistory).filter(or_(
-                        TransferHistory.src.like("cloudsubscribe://%"),
+                        TransferHistory.src.like("panbox://%"),
                         TransferHistory.downloader == "网盘助手",
                     ))
                     if not all_managed:

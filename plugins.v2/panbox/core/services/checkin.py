@@ -778,7 +778,7 @@ class CheckinService(OwnerDelegator):
                     "lock_acquired": True,
                 },
                 daemon=True,
-                name=f"cloudsubscribe-checkin-{adapter.key}",
+                name=f"panbox-checkin-{adapter.key}",
             ).start()
         except Exception:
             self._run_lock.release()

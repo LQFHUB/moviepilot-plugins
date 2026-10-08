@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from threading import RLock
 from typing import Any, Dict
 
@@ -25,7 +24,7 @@ class PanBoxDataStore:
         self._lock = RLock()
         self._initialized = False
         self.manager = PanBoxDatabaseManager(
-            _resolve_db_path(owner)
+            owner.get_data_path() / "panbox.db"
         )
         self.repositories = PanBoxRepositories(self.manager)
 
@@ -171,25 +170,10 @@ class PanBoxDataStore:
 
     def close(self) -> None:
         self.manager.close()
-
-def _resolve_db_path(owner) -> "Path":
-    """返回插件数据库路径（含改名兼容回退）。
-
-    优先使用本插件自己的数据目录 ``<配置目录>/plugins/<插件ID>/cloudsubscribe.db``；
-    若该文件不存在，而**旧插件 ID** ``PanBox`` 的同名数据库存在，则回退到它——
-    用于本插件由 ``PanBox`` 改名为 ``PanBox`` 后，继续沿用既有的网盘账号与历史数据。
-    这是本项目为改名所做的唯一适配，不改变上游任何业务逻辑。
-
-    :param owner: 插件实例（需提供 ``get_data_path()``）
-    :return: 数据库文件路径
-    """
-    own = owner.get_data_path() / "cloudsubscribe.db"
-    if own.exists():
-        return own
     try:
         from app.core.config import settings as host_settings
 
-        legacy = host_settings.PLUGIN_DATA_PATH / "CloudSubscribe" / "cloudsubscribe.db"
+        legacy = host_settings.PLUGIN_DATA_PATH / "PanBox" / "panbox.db"
         if legacy.exists():
             return legacy
     except Exception:  # noqa: BLE001 - 宿主导入失败时退回自身路径

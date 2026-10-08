@@ -43,7 +43,7 @@ class HistoryService(OwnerDelegator):
 
     _METADATA_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
     _SEASON_DIRECTORY_PATTERN = re.compile(r"^season[ ._-]*\d+$", re.IGNORECASE)
-    _PLATFORM_HISTORY_STORAGE = "cloudsubscribe"
+    _PLATFORM_HISTORY_STORAGE = "panbox"
 
     def _build_transfer_history_item(
             self,

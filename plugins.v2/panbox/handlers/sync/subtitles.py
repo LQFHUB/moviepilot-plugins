@@ -518,7 +518,7 @@ class SubtitleService(OwnerDelegator):
                 return False
 
             # 远程字幕必须先下载到系统临时目录，内容识别完成后才能决定最终名称。
-            with tempfile.TemporaryDirectory(prefix="cloudsubscribe-subtitle-") as temp_dir:
+            with tempfile.TemporaryDirectory(prefix="panbox-subtitle-") as temp_dir:
                 temp_path = Path(temp_dir) / Path(source_name or provisional_name).name
                 try:
                     self._cloud_drive.require(
