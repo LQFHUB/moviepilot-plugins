@@ -162,7 +162,30 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 备选路线：本地插件源 —— 系统设置 `PLUGIN_LOCAL_REPO_PATHS`（`app/runtime/config.py:705`，逗号分隔，相对路径相对 `ROOT_PATH`）配合 `PLUGIN_AUTO_RELOAD` 热同步。
 - ⚠️ **未验证**：`moviepilot-v3` 容器是否挂载 `/volume1/share` 及容器内对应路径；NAS 无 SSH 权限（`root@192.168.31.200` 公钥被拒），走此路线前需在 NAS 侧确认。
 
-## 10. 事实来源
+## 10. 插件登记表（本仓库开发的插件）
+
+**本表只登记本仓库将要/正在开发的插件**，不登记运行实例上已安装的第三方插件。新增、改名、升级、下线插件时，必须同步更新本表与 `package.v3.json`。
+
+| 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
+|:---|:---|:---|:---|:---|:---|:---|
+| _（待登记）_ | — | — | — | — | 规划中 | 尚无插件，等待第一个插件立项 |
+
+状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
+
+### 每个插件的「相关信息」记录要求
+
+- **主体信息**（与 `package.v3.json` 条目保持一致）：插件 ID = 类名、目录名（小写）、名称、描述、labels、author、level、system_version、当前版本与 `history`。
+- **UI 模式**：`vuetify` JSON 或 `vue` 联邦；联邦插件记录暴露的组件名与 `dist/assets` 路径。
+- **用到的扩展点**：`get_api` / `get_service` / `get_command` / `get_actions` / `get_agent_tools` / `get_sidebar_nav` / `get_dashboard`（只列实际用到的）。
+- **配置与数据**：配置项键名；`save_data`/`get_data` 使用的 key（配置前缀由宿主生成为 `<instance_id_lower>_`，不需插件声明）。
+- **额外依赖**：`pyproject.toml` 新增依赖及其理由。
+- **对外副作用**：访问的网络目标、通知渠道、是否写媒体库/下载器。
+- **来源与许可**：自研，或改造自第三方（记录原插件 ID、原仓库、许可证）。
+- **变更历史**：版本 → 说明，与索引 `history` 同步。
+
+详情写在各插件目录内的 `README.md`，本表只保留一行总览，避免本文件膨胀。
+
+## 11. 事实来源
 
 - 本地 MoviePilot V3.1.1 源码副本：`/tmp/mp-v3-src`（解包所得，非 git 仓库；**`/tmp` 可能被清理**，引用前先确认存在）。
 - 知识库《🏠 日常/家庭基础设施.md》《autu.md》。
