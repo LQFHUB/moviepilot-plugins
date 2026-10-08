@@ -171,7 +171,12 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 | 取插件静态文件 | `GET /api/v1/plugin/file/{plugin_id_lower}/{path}` | 需 resource token（登录 Cookie）；无 token 返回 401 |
 
 ⚠️ **改仓库后必须先刷新市场再安装**：`install` 读取的是**冻结的市场清单**（`gateway.py:111` 的 `__inventory(False)`），不是安装时现拉。只 `force=true` 而不刷新市场，会装到**旧载荷**——实测出现过「新 chunk 文件已就位、`remoteEntry.js` 仍是旧版」的不一致状态。正确顺序：`push` → 刷新市场（`force=true`）→ 安装。
-⚠️ **安装后要校验变更生效**：对比实例返回的 `remoteEntry.js` 与本地构建产物的 sha256（见 README「前端」）。
+⚠️ **刷新市场前先确认 CDN 已更新**：市场索引取自 `raw.githubusercontent.com`（`client.py:214`），该域名有数分钟 CDN 缓存。实测推送后**立刻**刷新市场，抓到的是**上一版索引**（market 与运行版本都停在旧版），须等 CDN 刷新后再刷一次。校验方式：
+```bash
+curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package.v3.json | grep -o '"version": "[^"]*"' | head -1
+```
+确认版本号已是新版，再执行刷新→安装。
+⚠️ **安装后要校验变更生效**：对比实例返回的 `remoteEntry.js` 与本地构建产物的 sha256（见 README「前端」），并核对 `GET /api/v1/plugin/PanBox/meta` 的 `version`。
 
 **当前实例上的改动（如需回滚）**：`PLUGIN_MARKET` 已追加 `https://github.com/LQFHUB/moviepilot-plugins`（原 82 条 → 83 条）；原值与 revision 备份在 `/tmp/mp_settings_backup_20261008.json`（`/tmp` 易失，需长期保留请另存）。回滚即用该文件里的 `value` 做一次 `replace`。
 
