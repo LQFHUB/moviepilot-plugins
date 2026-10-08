@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.sdk.plugin import _PluginBase
 
 from .core.config import DEFAULT_CONFIG, build_config
+from .core.models import parse_share_url
 from .core.storage import PanBoxStore
 from .core.tg import ChannelSearcher
 from .drive.p115 import P115Client, P115Error
@@ -30,7 +31,7 @@ class PanBox(_PluginBase):
     plugin_name = "网盘助手"
     plugin_desc = "自建 Telegram 频道资源搜索，并把网盘分享一键转存到自己的网盘。"
     plugin_icon = "panbox.png"
-    plugin_version = "0.1.0"
+    plugin_version = "0.1.1"
     plugin_order = 100
 
     def __init__(self) -> None:
@@ -117,6 +118,13 @@ class PanBox(_PluginBase):
                 "methods": ["GET"],
                 "auth": "bear",
                 "summary": "获取网盘目标目录列表",
+            },
+            {
+                "path": "/drive/preview",
+                "endpoint": self.api_drive_preview,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "预览网盘分享内容（只读，不转存）",
             },
             {
                 "path": "/drive/check",
@@ -348,6 +356,46 @@ class PanBox(_PluginBase):
         )
         result = client.check()
         return {"success": bool(result.get("ok")), "message": result.get("message")}
+
+    def api_drive_preview(self, payload: Optional[dict] = None) -> Dict[str, Any]:
+        """预览 115 分享链接里的文件清单（**只读**，不会转存）。
+
+        用于转存前确认分享内容与体积，避免误转超大资源。
+
+        :param payload: 请求体，含 ``url``（115 分享链接），可选 ``receive_code``
+        :return: 分享码、提取码与文件清单
+        """
+        data = dict(payload or {})
+        url = str(data.get("url") or "").strip()
+        if not url:
+            return {"success": False, "message": "缺少分享链接"}
+        parsed = parse_share_url(url)
+        if not parsed or parsed.get("cloud_type") != "p115":
+            return {"success": False, "message": "不是可识别的 115 分享链接"}
+        receive_code = str(data.get("receive_code") or parsed.get("receive_code") or "").strip()
+        cookie = str(self._config.get("p115_cookie") or "")
+        if not cookie:
+            return {"success": False, "message": "未配置 115 Cookie"}
+        client = P115Client(
+            cookie=cookie,
+            timeout=int(self._config.get("search_timeout") or 20),
+            proxy=str(self._config.get("search_proxy") or "") or None,
+        )
+        try:
+            files = client.share_info(parsed["share_code"], receive_code)
+        except P115Error as error:
+            return {"success": False, "message": f"115 分享解析失败：{error}"}
+        total_size = sum(int(item.get("file_size") or 0) for item in files)
+        return {
+            "success": True,
+            "message": f"分享内共 {len(files)} 个文件",
+            "data": {
+                "share_code": parsed["share_code"],
+                "receive_code": receive_code,
+                "total_size": total_size,
+                "files": files,
+            },
+        }
 
     def api_history(
         self,
