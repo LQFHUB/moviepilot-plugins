@@ -159,6 +159,22 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 3. 在插件市场刷新，即可看到 `package.v3.json` 中的插件；安装会把源码复制到运行目录 `app/plugins/<id_lower>/`，改 `version` 后即为一次更新。
 4. ⚠️ 第 2 步会改动**运行中实例**的系统设置，执行前先说明并征得同意。
 
+**实例实测到的接口事实（2026-10-08 安装 PanBox 时验证）**：
+
+| 操作 | 方法与路径 | 备注 |
+|:---|:---|:---|
+| 读系统设置 | `GET /api/v1/system/settings?setting_key=<KEY>` | 返回 `data.settings[0].value` 与 `revision`；**不是** `/api/v1/settings/...`（那是 404） |
+| 改系统设置 | `POST /api/v1/system/settings` | body：`{setting_key, value, operation:"replace", expected_revision}` |
+| 刷新市场清单 | `GET /api/v1/plugin/?force=true&query=<ID>` | 重建市场清单；83 个仓库约 33 秒 |
+| 安装插件 | **`GET`** `/api/v1/plugin/install/{plugin_id}?force=true` | ⚠️ 是 **GET** 不是 POST（用 POST 会得到 405）；约 37 秒 |
+| 读/写插件配置 | `GET` / **`PUT`** `/api/v1/plugin/{plugin_id}` | PUT body 即插件配置 dict（需 superuser） |
+| 取插件静态文件 | `GET /api/v1/plugin/file/{plugin_id_lower}/{path}` | 需 resource token（登录 Cookie）；无 token 返回 401 |
+
+⚠️ **改仓库后必须先刷新市场再安装**：`install` 读取的是**冻结的市场清单**（`gateway.py:111` 的 `__inventory(False)`），不是安装时现拉。只 `force=true` 而不刷新市场，会装到**旧载荷**——实测出现过「新 chunk 文件已就位、`remoteEntry.js` 仍是旧版」的不一致状态。正确顺序：`push` → 刷新市场（`force=true`）→ 安装。
+⚠️ **安装后要校验变更生效**：对比实例返回的 `remoteEntry.js` 与本地构建产物的 sha256（见 README「前端」）。
+
+**当前实例上的改动（如需回滚）**：`PLUGIN_MARKET` 已追加 `https://github.com/LQFHUB/moviepilot-plugins`（原 82 条 → 83 条）；原值与 revision 备份在 `/tmp/mp_settings_backup_20261008.json`（`/tmp` 易失，需长期保留请另存）。回滚即用该文件里的 `value` 做一次 `replace`。
+
 备选路线：本地插件源 —— 系统设置 `PLUGIN_LOCAL_REPO_PATHS`（`app/runtime/config.py:705`，逗号分隔，相对路径相对 `ROOT_PATH`）配合 `PLUGIN_AUTO_RELOAD` 热同步。
 - ⚠️ **未验证**：`moviepilot-v3` 容器是否挂载 `/volume1/share` 及容器内对应路径；NAS 无 SSH 权限（`root@192.168.31.200` 公钥被拒），走此路线前需在 NAS 侧确认。
 
@@ -168,7 +184,7 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.0 | vue 联邦 | 开发中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
+| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.0 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
 
 `PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
 - **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
@@ -177,10 +193,16 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 - **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
 - **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
 - **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（17 项测试，已通过）；`cd plugins.v3/panbox/frontend && npm run build`（构建末尾自动校验 `dist/assets` 产物完整性）。
+- **实例联调结果（2026-10-08，已在 `192.168.31.200:3000` 安装并启用）**：
+  - ✅ 已安装（v0.1.0，`has_page=True`、`runtime_compatible=True`），已启用；宿主侧栏 `sidebar_nav` 唯一入口即 PanBox（`nav_key=main`、`section=system`、`permission=manage`）。
+  - ✅ 联邦组件已注册：`/plugin/file/panbox/dist/assets/remoteEntry.js?v=0.1.0`，与本地构建产物 sha256 **一致**；entry 引用的 8 个 js/css 由实例返回 **全部 200**。
+  - ✅ 浏览器实测（真实宿主前端 v3.1.2，admin 登录）：侧栏「网盘助手」→ `#/plugin-app/PanBox/main` 正常渲染；四个页签（搜索/历史/收藏/账号）均正常；插件卡片详情对话框（`Page.vue`）正常；插件市场列表卡片显示名称/版本/描述/作者。
+  - ✅ UI 内真实搜索成功：关键词「流浪地球」跨 5 频道返回 **19 条 / 9261ms**，卡片正确显示频道、时间、网盘类型、提取码、复制/收藏/原消息链接。
+  - ✅ 失败路径有可读提示：点击「转存到115」弹出 snackbar「115 网盘未启用（请在插件配置中开启）」。
+  - ✅ API 层：`meta`/`search`/`history`(自动记录 19 条)/`favorites`(增·去重·删)/`drive.*` 失败路径 全部符合预期；零凭证泄露（提交内容与前端代码均未含 Token）。
 - **尚未验证（勿当作已可用）**：
-  1. **115 转存链路未经真实 Cookie 验证**——`share/snap`、`files`、`share/receive` 三个接口的请求头与参数取自同类开源实现，尚无可用 115 Cookie 做实测；
-  2. **插件尚未在 MoviePilot 实例上安装联调**（`PLUGIN_MARKET` 未接入，见第 9 节第 2 步）；
-  3. 前端 `dist/assets` 已按宿主契约构建并校验，但**未在宿主前端中实际加载**过（联邦 `init/get` 的真实交互未跑通）。
+  1. **115 转存链路仍未经真实 Cookie 验证**——需要用户先在插件设置页填入 115 Cookie 并开启 115，才能实测 `share/snap`、`files`、`share/receive` 全链路；
+  2. **配置对话框（`Config.vue`）未在宿主 UI 中打开验证**——其 expose 已注册、资源可取（200），且已由协议级冒烟测试覆盖，但宿主「设置 → 插件 → 网盘助手 → 设置」的真实打开路径未跑通（虚拟列表内按钮难以稳定点击）。
 - **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
