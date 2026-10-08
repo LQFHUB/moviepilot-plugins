@@ -1,0 +1,4 @@
+# 依赖与构建缓存（构建产物输出到 ../dist/assets，需要提交，不在此忽略）
+node_modules/
+.vite/
+*.log

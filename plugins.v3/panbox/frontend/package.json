@@ -1,0 +1,19 @@
+{
+  "name": "panbox-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PanBox（网盘助手）MoviePilot V3 Vue 联邦前端：暴露 Config / Page / AppPage",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/verify-dist.mjs",
+    "verify": "node scripts/verify-dist.mjs"
+  },
+  "devDependencies": {
+    "@originjs/vite-plugin-federation": "1.4.1",
+    "@vitejs/plugin-vue": "5.2.4",
+    "vite": "5.4.21",
+    "vue": "3.5.13",
+    "vuetify": "3.7.3"
+  }
+}

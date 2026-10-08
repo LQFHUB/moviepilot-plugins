@@ -66,6 +66,23 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 | `search_history` | 历史记录数组，元素含 `id` / `created_at` / `source`(`search`\|`transfer`) / `item` |
 | `favorites` | 收藏数组，元素含 `id` / `created_at` / `note` / `item` |
 
+## 前端（Vue 联邦）
+
+源码在 `frontend/`（Vite 5 + Vue 3 + Vuetify 3 + `@originjs/vite-plugin-federation`），构建产物落在 `dist/assets/`：
+
+| 暴露模块 | 组件 | 宿主用途 |
+|:---|:---|:---|
+| `./Config` | `src/components/Config.vue` | 插件配置对话框，`emit save/close/switch`，配置由宿主保存 |
+| `./Page` | `src/components/Page.vue` | 插件详情对话框（`nav_key != main` 时的兜底页面） |
+| `./AppPage` | `src/components/AppPage.vue` | 主界面侧栏整页（`nav_key = main`），读取 `api`/`pluginId`/`navKey` |
+
+要点：
+
+- `remoteEntry.js` 必须位于 `dist/assets/` 根目录，且它引用的 js/css 与其同级（构建配置已固化，`npm run build` 末尾会自动校验）。
+- 构建会剔除仅服务本地调试的产物（`index.html`、`src/main.js` 入口）与无引用的 `__federation_shared_*` 样式副本（联邦插件即使 `generate: false` 仍会产出约 250KB 的 Vuetify 样式重复件），见 `frontend/vite.config.js` 的 `pruneBundle` 插件。
+- 前端始终通过宿主注入的 `api` 对象调用插件接口（`plugin/PanBox/...`），**不接触任何 Token**。
+- 本地调试：`cd frontend && npm install && npm run dev`（调试台走 `index.html` + `src/main.js`，不进入产物）。
+
 ## 依赖
 
 **无新增第三方依赖**。全部使用宿主已提供的运行时与接口：

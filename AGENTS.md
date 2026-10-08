@@ -176,7 +176,12 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 - **搜索实现**：自建抓取 `https://t.me/s/<频道>?q=<关键词>` 公开预览页，用宿主自带的 beautifulsoup4 解析；频道列表由插件配置（默认 5 个）。已实测：真实频道能命中并解析出网盘链接与提取码。Telegram 站内搜索为模糊匹配，需按 `search_filter` 做后置过滤。
 - **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
 - **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
-- **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（9 项纯逻辑单测，已通过）。
+- **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（17 项测试，已通过）；`cd plugins.v3/panbox/frontend && npm run build`（构建末尾自动校验 `dist/assets` 产物完整性）。
+- **尚未验证（勿当作已可用）**：
+  1. **115 转存链路未经真实 Cookie 验证**——`share/snap`、`files`、`share/receive` 三个接口的请求头与参数取自同类开源实现，尚无可用 115 Cookie 做实测；
+  2. **插件尚未在 MoviePilot 实例上安装联调**（`PLUGIN_MARKET` 未接入，见第 9 节第 2 步）；
+  3. 前端 `dist/assets` 已按宿主契约构建并校验，但**未在宿主前端中实际加载**过（联邦 `init/get` 的真实交互未跑通）。
+- **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
 
