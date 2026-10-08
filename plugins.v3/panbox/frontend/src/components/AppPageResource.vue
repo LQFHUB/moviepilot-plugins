@@ -12,6 +12,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { createPanBoxApi, readError } from '../utils/api'
 import { useResourceActions } from '../composables/useResourceActions'
+import { proxiedImage } from '../utils/image'
 import ResourceCard from './common/ResourceCard.vue'
 
 const props = defineProps({
@@ -303,7 +304,7 @@ onMounted(bootstrap)
         @click="openDetail(media)"
       >
         <span class="pbx-card__poster">
-          <img v-if="media.poster" :src="media.poster" :alt="media.title" loading="lazy" />
+          <img v-if="media.poster" :src="proxiedImage(media.poster)" :alt="media.title" loading="lazy" />
           <span v-else class="pbx-card__placeholder"><v-icon icon="mdi-movie-outline" size="26" /></span>
           <span v-if="media.vote_average" class="pbx-card__rate">{{ media.vote_average.toFixed(1) }}</span>
           <span class="pbx-card__type">{{ media.media_type === 'tv' ? '剧集' : '电影' }}</span>
@@ -317,7 +318,7 @@ onMounted(bootstrap)
     <v-dialog v-model="detailOpen" max-width="62rem" scrollable>
       <v-card class="pbx-detail">
         <div class="pbx-detail__head">
-          <img v-if="detailMedia?.poster" :src="detailMedia.poster" class="pbx-detail__poster" :alt="detailMedia?.title" />
+          <img v-if="detailMedia?.poster" :src="proxiedImage(detailMedia?.poster)" class="pbx-detail__poster" :alt="detailMedia?.title" />
           <div class="pbx-detail__info">
             <div class="pbx-detail__title">
               {{ detailMedia?.title }}

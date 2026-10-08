@@ -12,6 +12,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { createPanBoxApi, readError } from '../utils/api'
 import { useNotifier } from '../composables/useNotifier'
+import { proxiedImage } from '../utils/image'
 
 const props = defineProps({
   /** 宿主注入的 api 对象 */
@@ -231,7 +232,7 @@ onMounted(load)
 
     <div v-else class="pbx-subs__list">
       <v-card v-for="subscription in list" :key="subscription.id" class="pbx-sub" flat>
-        <img v-if="subscription.poster_url" :src="subscription.poster_url" class="pbx-sub__poster" :alt="subscription.title" />
+        <img v-if="subscription.poster_url" :src="proxiedImage(subscription.poster_url)" class="pbx-sub__poster" :alt="subscription.title" />
         <div v-else class="pbx-sub__poster pbx-sub__poster--empty">
           <v-icon icon="mdi-movie-outline" size="22" />
         </div>
@@ -316,7 +317,7 @@ onMounted(load)
 
           <div class="pbx-add__results">
             <div v-for="(media, index) in addResults" :key="`${media.media_id}-${index}`" class="pbx-add__item">
-              <img v-if="media.poster" :src="media.poster" class="pbx-add__poster" :alt="media.title" />
+              <img v-if="media.poster" :src="proxiedImage(media.poster)" class="pbx-add__poster" :alt="media.title" />
               <div v-else class="pbx-add__poster pbx-add__poster--empty"><v-icon icon="mdi-movie-outline" size="18" /></div>
               <div class="pbx-add__info">
                 <div class="pbx-add__name">{{ media.title }}</div>
