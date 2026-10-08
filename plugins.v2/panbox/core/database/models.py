@@ -1,4 +1,4 @@
-"""CloudSubscribe 独立 SQLite ORM 模型。"""
+"""PanBox 独立 SQLite ORM 模型。"""
 
 from typing import Any, Dict, List, Optional
 
@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, Index, Integer, JSON, String, delete, inspect, s
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 
-class CloudSubscribeBase(DeclarativeBase):
+class PanBoxBase(DeclarativeBase):
     """私有库模型基类，提供与平台 Base 一致的通用 CRUD 能力。"""
 
     __abstract__ = True
@@ -52,7 +52,7 @@ class CloudSubscribeBase(DeclarativeBase):
         }
 
 
-class HistoryRecord(CloudSubscribeBase):
+class HistoryRecord(PanBoxBase):
     __tablename__ = "history_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -84,7 +84,7 @@ class HistoryRecord(CloudSubscribeBase):
     )
 
 
-class OfflinePendingTask(CloudSubscribeBase):
+class OfflinePendingTask(PanBoxBase):
     __tablename__ = "offline_pending_tasks"
 
     pending_key: Mapped[str] = mapped_column(String(255), primary_key=True)
@@ -99,7 +99,7 @@ class OfflinePendingTask(CloudSubscribeBase):
     )
 
 
-class CheckinHistoryRecord(CloudSubscribeBase):
+class CheckinHistoryRecord(PanBoxBase):
     __tablename__ = "checkin_history"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -115,7 +115,7 @@ class CheckinHistoryRecord(CloudSubscribeBase):
     )
 
 
-class CheckinScheduleState(CloudSubscribeBase):
+class CheckinScheduleState(PanBoxBase):
     __tablename__ = "checkin_schedule_state"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
@@ -126,7 +126,7 @@ class CheckinScheduleState(CloudSubscribeBase):
     completed_retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class PointBudgetRecord(CloudSubscribeBase):
+class PointBudgetRecord(PanBoxBase):
     __tablename__ = "point_budget_records"
 
     provider: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -138,7 +138,7 @@ class PointBudgetRecord(CloudSubscribeBase):
     )
 
 
-class AccountSnapshot(CloudSubscribeBase):
+class AccountSnapshot(PanBoxBase):
     __tablename__ = "account_snapshots"
 
     account_key: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -146,7 +146,7 @@ class AccountSnapshot(CloudSubscribeBase):
     payload: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
-class AuthSession(CloudSubscribeBase):
+class AuthSession(PanBoxBase):
     __tablename__ = "auth_sessions"
 
     provider: Mapped[str] = mapped_column(String(64), primary_key=True)

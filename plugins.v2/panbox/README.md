@@ -1,7 +1,7 @@
-# CloudSubscribe 源码目录
+# 网盘助手（PanBox）
 
-本目录是 `CloudSubscribe` 的 MoviePilot v2 后端源码及 Release 前端产物目录。面向用户的安装、配置和功能说明见
-[网盘订阅助手使用说明](../../docs/cloudsubscribe.md)。
+本目录是 `PanBox` 的 MoviePilot v2 后端源码及 Release 前端产物目录。面向用户的安装、配置和功能说明见
+[网盘助手使用说明](../../docs/cloudsubscribe.md)。
 
 ## 目录职责
 
@@ -39,6 +39,6 @@ cloudsubscribe/
 发布标签与资产命名遵循 MoviePilot 约定：
 
 ```text
-CloudSubscribe_v<version>
+PanBox_v<version>
 cloudsubscribe_v<version>.zip
 ```

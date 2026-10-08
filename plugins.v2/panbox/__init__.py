@@ -1,5 +1,5 @@
 """
-网盘订阅助手插件
+网盘助手插件
 结合订阅功能，自动搜索网盘资源并同步缺失内容
 """
 import copy
@@ -47,7 +47,7 @@ from .core.services import (
     SyncExecutionService,
     SyncRuntimeService,
 )
-from .core.storage import CloudSubscribeDataStore
+from .core.storage import PanBoxDataStore
 from .core.subscribe import AutoSubscribeService
 from .drive.scanner import DriverRegistry
 from .handlers import SearchHandler, SyncHandler, SubscribeHandler, WebhookHandler
@@ -91,10 +91,10 @@ _COMPONENT_TYPES = (
 
 
 class PanBox(_PluginBase):
-    """网盘订阅助手插件。"""
+    """网盘助手插件。"""
 
     # 插件名称
-    plugin_name = "PanBox"
+    plugin_name = "网盘助手"
     # 插件描述
     plugin_desc = "整合网盘能力与多渠道资源搜索，自动查找并补充订阅缺失的影视内容。"
     # 插件图标
@@ -266,10 +266,10 @@ class PanBox(_PluginBase):
         if self._drive_manager:
             self._drive_manager._clients["115"] = value
 
-    def _get_data_store(self) -> CloudSubscribeDataStore:
+    def _get_data_store(self) -> PanBoxDataStore:
         store = self.__dict__.get("_cloudsubscribe_data_store")
         if store is None:
-            store = CloudSubscribeDataStore(self)
+            store = PanBoxDataStore(self)
             self.__dict__["_cloudsubscribe_data_store"] = store
         return store
 
@@ -277,7 +277,7 @@ class PanBox(_PluginBase):
         """读取插件业务数据与可恢复运行状态，统一使用私有库。"""
         target_plugin = plugin_id or self.__class__.__name__
         if target_plugin == self.__class__.__name__ and key:
-            if CloudSubscribeDataStore.handles(key):
+            if PanBoxDataStore.handles(key):
                 return self._get_data_store().load(key)
             return None
         return super().get_data(key=key, plugin_id=plugin_id)
@@ -288,7 +288,7 @@ class PanBox(_PluginBase):
         """保存插件数据"""
         target_plugin = plugin_id or self.__class__.__name__
         if target_plugin == self.__class__.__name__:
-            if CloudSubscribeDataStore.handles(key):
+            if PanBoxDataStore.handles(key):
                 self._get_data_store().save(key, value)
                 return
             raise ValueError(f"未声明的数据键不能写入 PluginData：{key}")

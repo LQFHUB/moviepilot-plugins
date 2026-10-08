@@ -1,9 +1,9 @@
-"""CloudSubscribe 独立数据库。"""
+"""PanBox 独立数据库。"""
 
-from .manager import CloudSubscribeDatabaseManager
-from .repositories import CloudSubscribeRepositories
+from .manager import PanBoxDatabaseManager
+from .repositories import PanBoxRepositories
 
 __all__ = [
-    "CloudSubscribeDatabaseManager",
-    "CloudSubscribeRepositories",
+    "PanBoxDatabaseManager",
+    "PanBoxRepositories",
 ]

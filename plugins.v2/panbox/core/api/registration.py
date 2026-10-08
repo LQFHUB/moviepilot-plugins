@@ -16,16 +16,16 @@ from fastapi import Depends
 
 from .. import OwnerDelegator
 from ..agent import (
-    CloudSubscribeCacheClearTool,
-    CloudSubscribeCheckinTool,
-    CloudSubscribeCheckinHistoryTool,
-    CloudSubscribeConfigUpdateTool,
-    CloudSubscribeLinksTool,
-    CloudSubscribePerformanceTool,
-    CloudSubscribeResourceSearchTool,
-    CloudSubscribeResourceSelectTool,
-    CloudSubscribeStatusTool,
-    CloudSubscribeSyncTool,
+    PanBoxCacheClearTool,
+    PanBoxCheckinTool,
+    PanBoxCheckinHistoryTool,
+    PanBoxConfigUpdateTool,
+    PanBoxLinksTool,
+    PanBoxPerformanceTool,
+    PanBoxResourceSearchTool,
+    PanBoxResourceSelectTool,
+    PanBoxStatusTool,
+    PanBoxSyncTool,
 )
 from ..config import UIConfig
 
@@ -449,7 +449,7 @@ class MoviePilotRegistration(OwnerDelegator):
         if not self._enabled:
             return []
         return [
-            {"key": "overview", "name": "网盘订阅助手"},
+            {"key": "overview", "name": "网盘助手"},
             {"key": "checkin", "name": "签到概览"},
         ]
 
@@ -460,7 +460,7 @@ class MoviePilotRegistration(OwnerDelegator):
             return None
         dashboards = {
             "overview": {
-                "title": "网盘订阅助手",
+                "title": "网盘助手",
                 "subtitle": "订阅任务与转存概览",
                 "dashboard": "overview",
             },
@@ -523,16 +523,16 @@ class MoviePilotRegistration(OwnerDelegator):
         if not self._enabled or not self._agent_enabled:
             return []
         return [
-            CloudSubscribeStatusTool,
-            CloudSubscribeSyncTool,
-            CloudSubscribeCheckinTool,
-            CloudSubscribeCheckinHistoryTool,
-            CloudSubscribeLinksTool,
-            CloudSubscribeResourceSearchTool,
-            CloudSubscribeResourceSelectTool,
-            CloudSubscribeCacheClearTool,
-            CloudSubscribeConfigUpdateTool,
-            CloudSubscribePerformanceTool,
+            PanBoxStatusTool,
+            PanBoxSyncTool,
+            PanBoxCheckinTool,
+            PanBoxCheckinHistoryTool,
+            PanBoxLinksTool,
+            PanBoxResourceSearchTool,
+            PanBoxResourceSelectTool,
+            PanBoxCacheClearTool,
+            PanBoxConfigUpdateTool,
+            PanBoxPerformanceTool,
         ]
 
     @staticmethod
@@ -601,7 +601,7 @@ class MoviePilotRegistration(OwnerDelegator):
                 and self._cron_is_valid(getattr(self, "_auto_subscribe_cron", ""))
         ):
             services.append({
-                "id": "CloudSubscribe_AutoSubscribe",
+                "id": "PanBox_AutoSubscribe",
                 "name": "榜单自动订阅服务",
                 "trigger": CronTrigger.from_crontab(self._auto_subscribe_cron),
                 "func": self.run_auto_subscribe,
@@ -611,8 +611,8 @@ class MoviePilotRegistration(OwnerDelegator):
         if self._cron and self._cron_is_valid(self._cron):
             try:
                 services.append({
-                    "id": "CloudSubscribe",
-                    "name": "网盘订阅助手服务",
+                    "id": "PanBox",
+                    "name": "网盘助手服务",
                     "trigger": CronTrigger.from_crontab(self._cron),
                     "func": self.sync_subscribes,
                     "kwargs": {}
@@ -620,23 +620,23 @@ class MoviePilotRegistration(OwnerDelegator):
             except Exception as e:
                 logger.warning(f"Cron 表达式无效：{self._cron}，将回退默认 0 18-23 * * *。错误：{e}")
                 services.append({
-                    "id": "CloudSubscribe",
-                    "name": "网盘订阅助手服务",
+                    "id": "PanBox",
+                    "name": "网盘助手服务",
                     "trigger": CronTrigger.from_crontab("0 18-23 * * *"),
                     "func": self.sync_subscribes,
                     "kwargs": {}
                 })
         else:
             services.append({
-                "id": "CloudSubscribe",
-                "name": "网盘订阅助手服务",
+                "id": "PanBox",
+                "name": "网盘助手服务",
                 "trigger": CronTrigger.from_crontab("0 18-23 * * *"),
                 "func": self.sync_subscribes,
                 "kwargs": {}
             })
 
         services.append({
-            "id": "CloudSubscribe_TakeoverInstall",
+            "id": "PanBox_TakeoverInstall",
             "name": "网盘订阅接管初始化",
             "trigger": DateTrigger(
                 run_date=(
@@ -678,7 +678,7 @@ class MoviePilotRegistration(OwnerDelegator):
                     ]
                 )
             services.append({
-                "id": "CloudSubscribe_Checkin",
+                "id": "PanBox_Checkin",
                 "name": "签到服务",
                 "trigger": checkin_trigger,
                 "func": self.run_scheduled_checkins,

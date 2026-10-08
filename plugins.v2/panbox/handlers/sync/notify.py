@@ -86,8 +86,8 @@ class SyncNotificationService(OwnerDelegator):
         notification_type = getattr(self, "_notification_type", NotificationType.Plugin)
 
         kind_config = {
-            "transfer": ("【网盘订阅助手】转存完成", "转存"),
-            "cross_transfer": ("【网盘订阅助手】跨盘转存完成", "跨盘转存"),
+            "transfer": ("【网盘助手】转存完成", "转存"),
+            "cross_transfer": ("【网盘助手】跨盘转存完成", "跨盘转存"),
             "upgrade": ("【网盘洗版】洗版完成", "洗版"),
         }
         grouped: Dict[str, List[Dict[str, Any]]] = {}

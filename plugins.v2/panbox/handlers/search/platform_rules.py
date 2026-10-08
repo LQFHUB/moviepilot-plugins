@@ -13,7 +13,7 @@ from ...search.matching import positive_ints
 
 
 class PlatformRuleService(OwnerDelegator):
-    """集中处理平台过滤规则与 CloudSubscribe 资源结构之间的适配。"""
+    """集中处理平台过滤规则与 PanBox 资源结构之间的适配。"""
 
     @staticmethod
     def _resource_filter_title(resource: Dict[str, Any]) -> str:
@@ -344,7 +344,7 @@ class PlatformRuleService(OwnerDelegator):
                 self._platform_filter_module = FilterModule()
                 self._platform_filter_module.init_module()
                 self._platform_filter_signature = signature
-                logger.debug("MoviePilot平台过滤规则已同步到 CloudSubscribe")
+                logger.debug("MoviePilot平台过滤规则已同步到 PanBox")
             return self._platform_filter_module.filter_torrents(
                 rule_groups=rule_groups,
                 torrent_list=torrent_list,

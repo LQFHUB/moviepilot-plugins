@@ -27,7 +27,7 @@ class MikanClient:
     """Mikan 网站 HTTP 客户端，具备请求门控、HTML 表格解析与 RSS XML 解析能力。"""
 
     _HEADERS = {
-        "User-Agent": "MoviePilot-CloudSubscribe-Mikan/1.0",
+        "User-Agent": "MoviePilot-PanBox-Mikan/1.0",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
 

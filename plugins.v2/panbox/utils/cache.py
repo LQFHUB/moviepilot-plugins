@@ -1,4 +1,4 @@
-"""CloudSubscribe 对 MoviePilot 平台缓存工具的轻量封装。"""
+"""PanBox 对 MoviePilot 平台缓存工具的轻量封装。"""
 
 import copy
 import json

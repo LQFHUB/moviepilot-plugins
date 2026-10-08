@@ -25,7 +25,7 @@ class AnimeGardenClient:
     """AnimeGarden API 客户端，使用共享门控 RequestGate 与高级检索能力。"""
 
     _HEADERS = {
-        "User-Agent": "MoviePilot-CloudSubscribe-AnimeGarden/1.0",
+        "User-Agent": "MoviePilot-PanBox-AnimeGarden/1.0",
         "Accept": "application/json",
     }
 

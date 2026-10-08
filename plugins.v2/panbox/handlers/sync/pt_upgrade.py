@@ -36,7 +36,7 @@ class PtUpgradeService(OwnerDelegator):
     def _staging_name(path: Path, checksum: str) -> str:
         suffix = path.suffix
         stem = path.stem[:160]
-        return f"CloudSubscribe_PT_{checksum[:12]}_{stem}{suffix}"
+        return f"PanBox_PT_{checksum[:12]}_{stem}{suffix}"
 
     def _pt_upgrade_subscribe(self, mediainfo, meta):
         tmdb_id = int(getattr(mediainfo, "tmdb_id", 0) or 0)

@@ -191,7 +191,7 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
 | ~~`PanBox`~~ | ~~`plugins.v3/panbox`~~ | ~~网盘助手~~ | 0.2.3 | vue 联邦 | **已下线（2026-10-08 按用户要求移除，源码见 git 历史 `98dcc7c`）** | 自建 TG 频道资源搜索 + 转存 + 账号管理 + 历史/收藏 + 侧栏整页 |
-| `PanBox` | `plugins.v2/panbox` | PanBox | 1.6.6 | vue 联邦 | **已入库（改造版，待继续开发）** | 改写自 `odomu/MoviePilot-Plugins` 的「网盘订阅助手」（**GPL-3.0**，保留 LICENSE 与署名）；ID/类名/目录均为 `PanBox`，与市场第三方 `CloudSubscribe` **并存不冲突**；V2 布局，前端产物已构建提交，`release: false` |
+| `PanBox` | `plugins.v2/panbox` | 网盘助手 | 1.6.6 | vue 联邦 | **已入库（改造版，待继续开发）** | 改写自 `odomu/MoviePilot-Plugins` 的网盘订阅插件（**GPL-3.0**，保留 LICENSE 与署名）；ID/类名/目录均为 `PanBox`，与市场第三方 `CloudSubscribe` **并存不冲突**；V2 布局，前端产物已构建提交，`release: false` |
 
 `PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
 - **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。

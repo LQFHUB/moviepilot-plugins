@@ -1,4 +1,4 @@
-"""夸克网盘 HTTP 客户端，仅包含 CloudSubscribe 使用的接口。"""
+"""夸克网盘 HTTP 客户端，仅包含 PanBox 使用的接口。"""
 
 from __future__ import annotations
 

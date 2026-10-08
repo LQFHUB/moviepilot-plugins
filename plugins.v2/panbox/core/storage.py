@@ -1,4 +1,4 @@
-"""CloudSubscribe 插件业务数据与可恢复运行状态的 ORM 入口。"""
+"""PanBox 插件业务数据与可恢复运行状态的 ORM 入口。"""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Any, Dict
 
 from app.log import logger
 
-from .database import CloudSubscribeDatabaseManager, CloudSubscribeRepositories
+from .database import PanBoxDatabaseManager, PanBoxRepositories
 
 
-class CloudSubscribeDataStore:
+class PanBoxDataStore:
     """业务数据和可恢复运行状态按职责写入独立数据库。"""
 
     HISTORY_KEY = "history"
@@ -24,10 +24,10 @@ class CloudSubscribeDataStore:
     def __init__(self, owner):
         self._lock = RLock()
         self._initialized = False
-        self.manager = CloudSubscribeDatabaseManager(
+        self.manager = PanBoxDatabaseManager(
             _resolve_db_path(owner)
         )
-        self.repositories = CloudSubscribeRepositories(self.manager)
+        self.repositories = PanBoxRepositories(self.manager)
 
     @staticmethod
     def _checkin_provider(key: str) -> str:
@@ -74,7 +74,7 @@ class CloudSubscribeDataStore:
             self.manager.update_db()
             repaired = self.repositories.history.repair_group_keys()
             if repaired:
-                logger.info(f"CloudSubscribe 历史媒体分组已修复：{repaired} 条")
+                logger.info(f"PanBox 历史媒体分组已修复：{repaired} 条")
             self._initialized = True
 
     def _load_database(self, key: str) -> Any:
@@ -176,8 +176,8 @@ def _resolve_db_path(owner) -> "Path":
     """返回插件数据库路径（含改名兼容回退）。
 
     优先使用本插件自己的数据目录 ``<配置目录>/plugins/<插件ID>/cloudsubscribe.db``；
-    若该文件不存在，而**旧插件 ID** ``CloudSubscribe`` 的同名数据库存在，则回退到它——
-    用于本插件由 ``CloudSubscribe`` 改名为 ``PanBox`` 后，继续沿用既有的网盘账号与历史数据。
+    若该文件不存在，而**旧插件 ID** ``PanBox`` 的同名数据库存在，则回退到它——
+    用于本插件由 ``PanBox`` 改名为 ``PanBox`` 后，继续沿用既有的网盘账号与历史数据。
     这是本项目为改名所做的唯一适配，不改变上游任何业务逻辑。
 
     :param owner: 插件实例（需提供 ``get_data_path()``）

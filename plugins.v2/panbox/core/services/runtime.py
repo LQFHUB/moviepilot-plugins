@@ -1477,7 +1477,7 @@ class SyncRuntimeService(OwnerDelegator):
             if pending_count > 0:
                 if scheduler and scheduler.running:
                     scheduler.modify_job(
-                        "CloudSubscribe_OfflineMonitor",
+                        "PanBox_OfflineMonitor",
                         next_run_time=datetime.datetime.now(
                             tz=pytz.timezone(settings.TZ)
                         ) + datetime.timedelta(seconds=1),
@@ -1487,7 +1487,7 @@ class SyncRuntimeService(OwnerDelegator):
                 scheduler.add_job(
                     func=self.monitor_offline_tasks,
                     trigger=IntervalTrigger(seconds=20),
-                    id="CloudSubscribe_OfflineMonitor",
+                    id="PanBox_OfflineMonitor",
                     next_run_time=datetime.datetime.now(
                         tz=pytz.timezone(settings.TZ)
                     ) + datetime.timedelta(seconds=3),

@@ -1,4 +1,4 @@
-"""CloudSubscribe 业务数据 Repository。"""
+"""PanBox 业务数据 Repository。"""
 
 import copy
 import hashlib
@@ -12,7 +12,7 @@ from sqlalchemy import Integer, case, cast, delete, func, or_, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from .manager import CloudSubscribeDatabaseManager, DbOper, db_query, db_update
+from .manager import PanBoxDatabaseManager, DbOper, db_query, db_update
 from .models import (
     AccountSnapshot,
     AuthSession,
@@ -64,7 +64,7 @@ def _timestamp(value: Any) -> int:
 
 
 class HistoryRepository(DbOper):
-    def __init__(self, manager: CloudSubscribeDatabaseManager, db: Session = None):
+    def __init__(self, manager: PanBoxDatabaseManager, db: Session = None):
         super().__init__(manager, db)
         self._filter_options_lock = RLock()
         self._filter_options: Optional[Dict[str, List[str]]] = None
@@ -843,10 +843,10 @@ class AuthSessionRepository(DbOper):
         }
 
 
-class CloudSubscribeRepositories:
+class PanBoxRepositories:
     def __init__(
             self,
-            manager: CloudSubscribeDatabaseManager,
+            manager: PanBoxDatabaseManager,
             db: Session = None,
     ):
         self.history = HistoryRepository(manager, db)

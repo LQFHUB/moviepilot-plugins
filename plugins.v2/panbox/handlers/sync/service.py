@@ -144,7 +144,7 @@ class SyncHandler:
         """
         初始化同步处理器。
 
-        :param plugin: 宿主插件实例（如 CloudSubscribe），提供全局配置与平台能力回调
+        :param plugin: 宿主插件实例（如 PanBox），提供全局配置与平台能力回调
         :param cloud_drive: 当前网盘提供方（可选，默认从 plugin 获取）
         :param search_handler: 搜索处理器（可选，默认从 plugin 获取）
         :param subscribe_handler: 订阅处理器（可选，默认从 plugin 获取）

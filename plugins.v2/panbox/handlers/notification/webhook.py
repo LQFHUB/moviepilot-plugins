@@ -10,7 +10,7 @@ from app.utils.http import RequestUtils
 class WebhookHandler:
     """在转存成功后向第三方接口发送一次汇总通知。"""
 
-    EVENT_TYPE = "CloudSubscribe.TransferComplete"
+    EVENT_TYPE = "PanBox.TransferComplete"
 
     def __init__(self, enabled: bool, url: str, method: str = "POST", timeout: int = 10):
         self._enabled = bool(enabled)
@@ -25,7 +25,7 @@ class WebhookHandler:
         payload = {
             "type": self.EVENT_TYPE,
             "data": {
-                "source": "CloudSubscribe",
+                "source": "PanBox",
                 "event": "transfer_complete",
                 "total_count": total_count,
                 "time": datetime.now().astimezone().isoformat(timespec="seconds"),

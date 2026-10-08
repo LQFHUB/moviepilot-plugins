@@ -1,4 +1,4 @@
-"""为 CloudSubscribe 私有数据库生成 Alembic 迁移脚本。"""
+"""为 PanBox 私有数据库生成 Alembic 迁移脚本。"""
 
 import argparse
 from configparser import ConfigParser
@@ -8,18 +8,18 @@ from alembic.command import revision
 from alembic.config import Config as AlembicConfig
 from app.core.config import settings
 
-from .models import CloudSubscribeBase
+from .models import PanBoxBase
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="生成 CloudSubscribe 数据库迁移")
+    parser = argparse.ArgumentParser(description="生成 PanBox 数据库迁移")
     parser.add_argument("message", help="迁移说明或版本号")
     parser.add_argument(
         "--db-path",
         type=Path,
         default=(
                 settings.PLUGIN_DATA_PATH
-                / "CloudSubscribe"
+                / "PanBox"
                 / "cloudsubscribe.db"
         ),
         help="用于比较旧结构的 SQLite 数据库路径",
@@ -35,7 +35,7 @@ def main() -> None:
         "script_location", str(Path(__file__).with_name("alembic"))
     )
     config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
-    config.attributes["target_metadata"] = CloudSubscribeBase.metadata
+    config.attributes["target_metadata"] = PanBoxBase.metadata
     revision(config, message=args.message, autogenerate=True)
 
 

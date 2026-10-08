@@ -145,7 +145,7 @@ class HistoryService(OwnerDelegator):
             "download_hash": download_hash,
             "torrent_name": torrent_name,
             "torrent_site": provider_name,
-            "username": "CloudSubscribe",
+            "username": "PanBox",
             "date": time.strftime("%Y-%m-%d %H:%M:%S"),
             "note": {
                 "source": f"Subscribe|{getattr(subscribe, 'name', '')}",

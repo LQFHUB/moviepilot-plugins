@@ -1,4 +1,4 @@
-"""CloudSubscribe 私有 SQLite 的 Alembic 运行环境。"""
+"""PanBox 私有 SQLite 的 Alembic 运行环境。"""
 
 from logging.config import fileConfig
 

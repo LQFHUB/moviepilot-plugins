@@ -1,4 +1,4 @@
-"""CloudSubscribe 独立 SQLite 引擎与会话生命周期。"""
+"""PanBox 独立 SQLite 引擎与会话生命周期。"""
 
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from alembic import command
-from .models import CloudSubscribeBase
+from .models import PanBoxBase
 
 
 def _database_operation(*, write: bool):
@@ -58,14 +58,14 @@ class DbOper:
 
     def __init__(
             self,
-            manager: "CloudSubscribeDatabaseManager",
+            manager: "PanBoxDatabaseManager",
             db: Session = None,
     ):
         self.manager = manager
         self._db = db
 
 
-class CloudSubscribeDatabaseManager:
+class PanBoxDatabaseManager:
     """管理插件私有数据库，不注册到 MoviePilot 主库 metadata。"""
 
     def __init__(self, db_path: Path):
@@ -92,14 +92,14 @@ class CloudSubscribeDatabaseManager:
         """按 ORM metadata 初始化新数据库和缺失表。"""
         self.open()
         if self._engine is None:
-            raise RuntimeError("CloudSubscribe 数据库引擎未初始化")
-        CloudSubscribeBase.metadata.create_all(bind=self._engine)
+            raise RuntimeError("PanBox 数据库引擎未初始化")
+        PanBoxBase.metadata.create_all(bind=self._engine)
 
     def update_db(self) -> None:
         """按程序化 Alembic 配置和 revision 链升级已有数据库结构。"""
         self.open()
         if self._engine is None:
-            raise RuntimeError("CloudSubscribe 数据库引擎未初始化")
+            raise RuntimeError("PanBox 数据库引擎未初始化")
         script_location = Path(__file__).with_name("alembic")
         config = AlembicConfig()
         config.file_config = ConfigParser(interpolation=None)
@@ -108,7 +108,7 @@ class CloudSubscribeDatabaseManager:
             "sqlalchemy.url",
             self._engine.url.render_as_string(hide_password=False),
         )
-        config.attributes["target_metadata"] = CloudSubscribeBase.metadata
+        config.attributes["target_metadata"] = PanBoxBase.metadata
         command.upgrade(config, "head")
 
     def open(self) -> None:
@@ -149,7 +149,7 @@ class CloudSubscribeDatabaseManager:
     def session(self, *, write: bool = False) -> Generator[Session, None, None]:
         self.open()
         if self._session_factory is None:
-            raise RuntimeError("CloudSubscribe 数据库会话工厂未初始化")
+            raise RuntimeError("PanBox 数据库会话工厂未初始化")
         db = self._session_factory()
         try:
             yield db
@@ -171,7 +171,7 @@ class CloudSubscribeDatabaseManager:
                             "PRAGMA wal_checkpoint(TRUNCATE);"
                         )
                 except Exception as error:
-                    logger.debug(f"CloudSubscribe WAL checkpoint 失败：{error}")
+                    logger.debug(f"PanBox WAL checkpoint 失败：{error}")
                 self._engine.dispose()
             self._engine = None
             self._session_factory = None

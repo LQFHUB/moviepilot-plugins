@@ -320,7 +320,7 @@ class SubscriptionSearchHook(OwnerDelegator):
             except Exception:
                 pass
 
-        # 3. 投递到网盘订阅助手搜索队列
+        # 3. 投递到网盘助手搜索队列
         subscribe_name = getattr(subscribe, "name", "") or getattr(subscribe, "title", "")
         logger.debug(
             f"订阅搜索转入网盘任务：id={subscribe_id or 'ALL'}，标题={subscribe_name}"
@@ -498,7 +498,7 @@ class SubscriptionSearchHook(OwnerDelegator):
         if progress_callback:
             progress_callback(
                 value=100,
-                text="订阅已由网盘订阅助手接管，跳过原生资源刷新",
+                text="订阅已由网盘助手接管，跳过原生资源刷新",
             )
         logger.debug("接管态已跳过原生订阅资源刷新")
         return True

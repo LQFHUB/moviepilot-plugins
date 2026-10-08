@@ -908,7 +908,7 @@ class PluginEventHandler(OwnerDelegator):
                     managed_subscribes, season_list, episode_list
             ):
                 event_data.cancel = True
-                event_data.source = "CloudSubscribe-重复资源拦截"
+                event_data.source = "PanBox-重复资源拦截"
                 event_data.reason = "同一订阅季集已有网盘任务正在处理，已阻止重复下载"
                 logger.debug(f"已阻止平台重复下载：{torrent.title}")
             return
@@ -929,7 +929,7 @@ class PluginEventHandler(OwnerDelegator):
                 except Exception as error:
                     logger.error(f"接管平台资源下载异常：{error}")
             event_data.cancel = True
-            event_data.source = "CloudSubscribe-平台资源下载接管"
+            event_data.source = "PanBox-平台资源下载接管"
             event_data.reason = (
                 "平台资源已提交插件离线下载"
                 if takeover_success else "平台资源下载接管失败，已阻止平台下载"
@@ -939,9 +939,9 @@ class PluginEventHandler(OwnerDelegator):
         if all_plugin_managed and policy == "block":
             sub_name = all_subs[0].name if all_subs else "未知"
             event_data.cancel = True
-            event_data.source = "CloudSubscribe-平台资源下载拦截"
+            event_data.source = "PanBox-平台资源下载拦截"
             event_data.reason = (
-                f"订阅{sub_name}已由网盘订阅助手接管，"
+                f"订阅{sub_name}已由网盘助手接管，"
                 f"已拦截平台资源下载：{torrent.title}"
             )
             logger.debug(

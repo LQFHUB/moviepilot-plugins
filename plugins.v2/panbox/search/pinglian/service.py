@@ -20,7 +20,7 @@ from ...core.search import SearchQuery, format_search_log_prefix
 
 
 class PinglianQuotaBudget:
-    """盘链每日链接解锁配额预算适配器，接入 CloudSubscribe 统一预算协议。"""
+    """盘链每日链接解锁配额预算适配器，接入 PanBox 统一预算协议。"""
 
     def __init__(self, service: Any, client: PinglianClient):
         self._service = service

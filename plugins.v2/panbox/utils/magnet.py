@@ -123,7 +123,7 @@ def _fetch_torrent_metadata(
         with httpx.stream(
                 "GET",
                 url_template.format(info_hash=info_hash),
-                headers={"User-Agent": "MoviePilot-CloudSubscribe/2.0"},
+                headers={"User-Agent": "MoviePilot-PanBox/2.0"},
                 timeout=max(1, float(timeout)),
                 follow_redirects=True,
         ) as response:

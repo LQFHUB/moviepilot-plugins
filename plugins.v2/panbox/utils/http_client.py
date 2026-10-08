@@ -1,4 +1,4 @@
-"""CloudSubscribe 通用 HTTP 与代理工具。"""
+"""PanBox 通用 HTTP 与代理工具。"""
 
 from typing import Any, Dict, Optional
 from urllib.parse import quote, unquote, urlsplit, urlunsplit

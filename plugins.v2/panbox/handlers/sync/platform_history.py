@@ -56,7 +56,7 @@ class PlatformHistoryService(OwnerDelegator):
         if resource_type == "cloud":
             return "网盘路径"
         from ...search.types import resource_type_name
-        return resource_type_name(resource_type, fallback="网盘订阅助手")
+        return resource_type_name(resource_type, fallback="网盘助手")
 
 
     @classmethod
@@ -144,7 +144,7 @@ class PlatformHistoryService(OwnerDelegator):
             "image": str(record.get("image") or "").strip() or None,
             "status": True,
             "files": [destination] if destination else [],
-            "downloader": "网盘订阅助手",
+            "downloader": "网盘助手",
             "date": str(record.get("time") or "").strip() or None,
         }
         if media_type == MediaType.MOVIE.value:
@@ -208,7 +208,7 @@ class PlatformHistoryService(OwnerDelegator):
                     if reconcile:
                         managed = db.query(TransferHistory).filter(or_(
                             TransferHistory.src.like("cloudsubscribe://%"),
-                            TransferHistory.downloader == "网盘订阅助手",
+                            TransferHistory.downloader == "网盘助手",
                         )).all()
                         existing_by_src = {item.src: item for item in managed}
                         for item in managed:
@@ -315,7 +315,7 @@ class PlatformHistoryService(OwnerDelegator):
                 with SessionFactory() as db:
                     query = db.query(TransferHistory).filter(or_(
                         TransferHistory.src.like("cloudsubscribe://%"),
-                        TransferHistory.downloader == "网盘订阅助手",
+                        TransferHistory.downloader == "网盘助手",
                     ))
                     if not all_managed:
                         query = query.filter(TransferHistory.src.in_(sources))

@@ -5,21 +5,21 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
-class CloudSubscribeStatusInput(BaseModel):
+class PanBoxStatusInput(BaseModel):
     include_recent: bool = Field(
         default=True,
         description="是否返回最近的转存记录摘要",
     )
 
 
-class CloudSubscribeSyncInput(BaseModel):
+class PanBoxSyncInput(BaseModel):
     explanation: str = Field(
         default="执行网盘订阅搜索",
         description="本次触发订阅搜索的原因",
     )
 
 
-class CloudSubscribeLinksInput(BaseModel):
+class PanBoxLinksInput(BaseModel):
     subscribe_id: Optional[int] = Field(
         default=None,
         gt=0,
@@ -61,7 +61,7 @@ class CloudSubscribeLinksInput(BaseModel):
     )
 
 
-class CloudSubscribeCheckinInput(BaseModel):
+class PanBoxCheckinInput(BaseModel):
     provider: Optional[str] = Field(
         default=None,
         description="签到渠道标识；省略时执行全部已启用渠道",
@@ -72,7 +72,7 @@ class CloudSubscribeCheckinInput(BaseModel):
     )
 
 
-class CloudSubscribeCheckinHistoryInput(BaseModel):
+class PanBoxCheckinHistoryInput(BaseModel):
     provider: Optional[str] = Field(
         default=None,
         description="签到渠道标识；省略时按渠道列出全部签到详情",
@@ -85,7 +85,7 @@ class CloudSubscribeCheckinHistoryInput(BaseModel):
     )
 
 
-class CloudSubscribeResourceSearchInput(BaseModel):
+class PanBoxResourceSearchInput(BaseModel):
     subscribe_id: Optional[int] = Field(
         default=None,
         gt=0,
@@ -119,7 +119,7 @@ class CloudSubscribeResourceSearchInput(BaseModel):
     )
 
 
-class CloudSubscribeResourceSelectInput(BaseModel):
+class PanBoxResourceSelectInput(BaseModel):
     search_id: str = Field(
         ...,
         min_length=1,
@@ -134,28 +134,28 @@ class CloudSubscribeResourceSelectInput(BaseModel):
     )
 
 
-class CloudSubscribeCacheClearInput(BaseModel):
+class PanBoxCacheClearInput(BaseModel):
     confirm: bool = Field(
         default=False,
-        description="用户是否已明确确认清理网盘订阅助手缓存；只有明确要求清理时才传 true",
+        description="用户是否已明确确认清理网盘助手缓存；只有明确要求清理时才传 true",
     )
 
 
-class CloudSubscribePerformanceInput(BaseModel):
+class PanBoxPerformanceInput(BaseModel):
     include_tasks: bool = Field(
         default=True,
         description="是否返回当前运行任务的耗时、进度和吞吐信息",
     )
 
 
-class CloudSubscribeConfigUpdateInput(BaseModel):
+class PanBoxConfigUpdateInput(BaseModel):
     show_sidebar_nav: Optional[bool] = Field(
         default=None,
         description="是否在左侧导航显示网盘订阅入口",
     )
     agent_enabled: Optional[bool] = Field(
         default=None,
-        description="是否启用网盘订阅助手智能体工具",
+        description="是否启用网盘助手智能体工具",
     )
     notify: Optional[bool] = Field(
         default=None,
