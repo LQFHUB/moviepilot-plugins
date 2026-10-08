@@ -129,7 +129,6 @@ class SubscriptionSyncer:
         searcher = ChannelSearcher(
             base_url=str(self._config.get("search_base_url") or "https://t.me/s"),
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         result = searcher.search(
             keyword=subscription.title,
@@ -191,7 +190,6 @@ class SubscriptionSyncer:
         client = P115Client(
             cookie=cookie,
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         size_gb = self._resolve_size(client, subscription, candidate)
         if size_gb is None:

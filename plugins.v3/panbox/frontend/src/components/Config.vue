@@ -47,7 +47,6 @@ const DEFAULT_FORM = {
   search_timeout: 20,
   search_filter: true,
   search_base_url: 'https://t.me/s',
-  search_proxy: '',
   p115_enabled: false,
   p115_cookie: '',
   p115_transfer_cid: '0',
@@ -77,7 +76,7 @@ const NAV_GROUPS = [
 /** 每个分类包含的配置键，用于「未保存修改」提示 */
 const SECTION_KEYS = {
   basic: ['enabled'],
-  search: ['channels', 'search_limit', 'search_filter', 'search_timeout', 'search_base_url', 'search_proxy'],
+  search: ['channels', 'search_limit', 'search_filter', 'search_timeout', 'search_base_url'],
   drive: ['p115_enabled', 'p115_cookie', 'p115_transfer_cid', 'p115_transfer_path'],
   data: ['history_limit', 'history_auto_record'],
 }
@@ -102,7 +101,6 @@ function normalize(raw) {
   form.search_timeout = Number(form.search_timeout) || DEFAULT_FORM.search_timeout
   form.history_limit = Number(form.history_limit) || DEFAULT_FORM.history_limit
   form.search_base_url = String(form.search_base_url || DEFAULT_FORM.search_base_url)
-  form.search_proxy = String(form.search_proxy ?? '')
   form.p115_cookie = String(form.p115_cookie ?? '')
   form.p115_transfer_cid = String(form.p115_transfer_cid || '0')
   form.p115_transfer_path = String(form.p115_transfer_path ?? '')
@@ -191,7 +189,6 @@ function buildPayload() {
     search_timeout: Number(form.search_timeout) || DEFAULT_FORM.search_timeout,
     search_filter: Boolean(form.search_filter),
     search_base_url: String(form.search_base_url || '').trim() || DEFAULT_FORM.search_base_url,
-    search_proxy: String(form.search_proxy || '').trim(),
     p115_enabled: Boolean(form.p115_enabled),
     p115_cookie: String(form.p115_cookie || '').trim(),
     p115_transfer_cid: String(form.p115_transfer_cid || '0').trim() || '0',
@@ -422,19 +419,6 @@ function onFolderSelected(payload) {
               </div>
             </div>
 
-            <div class="pbx-field">
-              <div class="pbx-field__label">网络代理</div>
-              <div class="pbx-field__control">
-                <v-text-field
-                  v-model="form.search_proxy"
-                  placeholder="http://127.0.0.1:7890"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <div class="pbx-hint">可选，留空表示直连；代理由插件后端发起请求时使用。</div>
-              </div>
-            </div>
           </template>
 
           <!-- 115 网盘 -->

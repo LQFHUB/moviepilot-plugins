@@ -21,7 +21,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "search_timeout": 20,
     "search_filter": True,
     "search_base_url": "https://t.me/s",
-    "search_proxy": "",
     # 115 网盘
     "p115_enabled": False,
     "p115_cookie": "",

@@ -189,7 +189,7 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.2.0 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
+| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.2.2 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
 
 `PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
 - **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
@@ -214,7 +214,7 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
   1. **115 写入（`share/receive`）仍未实测**——需要一条体积可接受的 115 分享（现有搜索到的资源均为 20GB~180GB，未擅自写入用户网盘）；
   2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，自动转存仅 115；
   3. v0.2.0 的四入口侧栏与订阅链路**尚未在实例验证**（`resource`/`movie`/`tv` 三个新页面的 `AppPage{PascalCase}` 解析、榜单接口、订阅增删与「立即搜索」均待真机确认）。
-- **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积。
+- **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积；**不提供网络代理设置**（实测容器可直连 `t.me`，豆瓣图片走宿主同源图片代理 `/api/v1/system/img/false?imgurl=`，无需代理）。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
 

@@ -34,7 +34,7 @@ class PanBox(_PluginBase):
     plugin_name = "网盘助手"
     plugin_desc = "自建 Telegram 频道资源搜索，并把网盘分享一键转存到自己的网盘。"
     plugin_icon = "panbox.png"
-    plugin_version = "0.2.1"
+    plugin_version = "0.2.2"
     plugin_order = 100
 
     def __init__(self) -> None:
@@ -322,7 +322,6 @@ class PanBox(_PluginBase):
         searcher = ChannelSearcher(
             base_url=str(self._config.get("search_base_url") or "https://t.me/s"),
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         started = time.time()
         result = searcher.search(
@@ -369,7 +368,6 @@ class PanBox(_PluginBase):
         client = P115Client(
             cookie=cookie,
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         cid = str(data.get("cid") or self._config.get("p115_transfer_cid") or "0")
         results: List[Dict[str, Any]] = []
@@ -431,7 +429,6 @@ class PanBox(_PluginBase):
         client = P115Client(
             cookie=cookie,
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         try:
             folders = client.folders(cid)
@@ -451,7 +448,6 @@ class PanBox(_PluginBase):
         client = P115Client(
             cookie=cookie,
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         result = client.check()
         return {"success": bool(result.get("ok")), "message": result.get("message")}
@@ -478,7 +474,6 @@ class PanBox(_PluginBase):
         client = P115Client(
             cookie=cookie,
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         try:
             files = client.share_info(parsed["share_code"], receive_code)
@@ -617,7 +612,6 @@ class PanBox(_PluginBase):
         searcher = ChannelSearcher(
             base_url=str(self._config.get("search_base_url") or "https://t.me/s"),
             timeout=int(self._config.get("search_timeout") or 20),
-            proxy=str(self._config.get("search_proxy") or "") or None,
         )
         result = searcher.search(
             keyword=text,

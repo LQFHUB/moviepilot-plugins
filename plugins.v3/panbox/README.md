@@ -61,7 +61,6 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 | `search_timeout` | `20` | 单次请求超时（秒） |
 | `search_filter` | `true` | 是否按关键词对结果做后置过滤（Telegram 站内搜索为模糊匹配） |
 | `search_base_url` | `https://t.me/s` | 频道预览页基址，可换镜像 |
-| `search_proxy` | `""` | 可选代理，形如 `http://127.0.0.1:7890` |
 | `p115_enabled` | `false` | 是否启用 115 转存 |
 | `p115_cookie` | `""` | 115 网页版 Cookie（**凭证，不入库**） |
 | `p115_transfer_cid` | `"0"` | 115 目标目录 ID（`0` 为根目录） |
