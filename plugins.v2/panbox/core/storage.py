@@ -170,12 +170,3 @@ class PanBoxDataStore:
 
     def close(self) -> None:
         self.manager.close()
-    try:
-        from app.core.config import settings as host_settings
-
-        legacy = host_settings.PLUGIN_DATA_PATH / "PanBox" / "panbox.db"
-        if legacy.exists():
-            return legacy
-    except Exception:  # noqa: BLE001 - 宿主导入失败时退回自身路径
-        pass
-    return own
