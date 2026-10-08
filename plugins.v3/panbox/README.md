@@ -14,16 +14,26 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 | level / system_version | `1` / `>=3.1.0` |
 | UI 模式 | `vue` 联邦，`get_render_mode() -> ("vue", "dist/assets")` |
 
-## 功能范围（v0.1.0）
+## 功能范围（v0.2.0）
+
+**侧栏入口（复用宿主菜单分组）**：
+
+| 入口 | nav_key | section | 落地页 | 说明 |
+|:---|:---|:---|:---|:---|
+| 网盘资源 | `resource` | `discovery` | `AppPageResource` | 出现在 MP「探索」分组；豆瓣 / TMDB 双榜单 + 标题搜索 + 海报网格 + 详情（频道页签资源列表） |
+| 网盘电影订阅 | `movie` | `subscribe` | `AppPageMovie` | 出现在 MP「订阅」分组；电影订阅的搜索与转存状态 |
+| 网盘剧集订阅 | `tv` | `subscribe` | `AppPageTv` | 同上，剧集维度（含季号过滤） |
+| 网盘助手 | `main` | `system` | `AppPage` | 管理页：搜索 / 历史 / 收藏 / 账号 |
 
 **做**：
 
+- 网盘资源浏览：复用宿主探索的**豆瓣与 TMDB** 两个数据源（榜单参数与探索页同源同参），海报网格展示；点开条目后按**频道页签**列出该条目在各 Telegram 频道中的网盘资源，可直接复制链接 / 收藏 / 转存。
 - 资源搜索：抓取 `https://t.me/s/<频道>?q=<关键词>` 公开预览页，解析消息并识别网盘分享链接（115/夸克/阿里/天翼/123/百度/移动）。
 - 频道管理：频道列表可配置，默认内置 5 个常用频道。
 - 转存：首批支持 **115 网盘**（自研 HTTP 驱动）；转存前可先「预览分享内容」确认体积，避免误转超大资源。
+- **网盘订阅（全自动）**：订阅某个影视条目后，定时服务按 `auto_sync_cron` 在频道中搜索 → 按网盘类型 / 季号 / 关键词 / 体积上下限筛选 → 选优转存 → 记录（同资源去重，不会重复转存）。
 - 网盘账号管理：115 Cookie 录入与连通性校验、目标目录选择。
-- 搜索历史与收藏：搜索命中可自动入历史；收藏独立于历史。
-- 侧栏整页入口：`get_sidebar_nav()` 提供 `nav_key = main`。
+- 历史与收藏：搜索命中与转存结果自动入历史；收藏独立于历史。
 
 **不做**（明确排除，避免回到"功能臃肿"）：
 
@@ -36,8 +46,8 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 
 ## 用到的扩展点
 
-`get_state` / `init_plugin` / `get_form` / `get_page` / `get_render_mode` / `get_sidebar_nav` / `get_api` / `stop_service`。
-未使用 `get_service` / `get_command` / `get_dashboard` / `get_actions` / `get_agent_tools`（内核无常驻服务）。
+`get_state` / `init_plugin` / `get_form` / `get_page` / `get_render_mode` / `get_sidebar_nav` / `get_api` / `get_service` / `stop_service`。
+未使用 `get_command` / `get_dashboard` / `get_actions` / `get_agent_tools`。
 
 ## 配置项
 
@@ -58,6 +68,13 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 | `p115_transfer_path` | `""` | 目标目录路径的展示备注 |
 | `history_limit` | `500` | 历史上限 |
 | `history_auto_record` | `true` | 搜索/转存是否自动写入历史 |
+| `auto_sync_enabled` | `false` | 是否启用网盘订阅的定时自动搜索+转存 |
+| `auto_sync_cron` | `0 */6 * * *` | 自动同步的 cron 表达式（宿主按 `CronTrigger.from_crontab` 解析） |
+| `auto_sync_cloud_types` | `["p115"]` | 允许自动转存的网盘类型 |
+| `auto_sync_prefer_keywords` | `4K,2160p,REMUX,高码` | 候选偏好关键词（命中越多越优先） |
+| `auto_sync_exclude_keywords` | `预告,花絮,TS,枪版` | 候选排除关键词 |
+| `auto_sync_min_size_gb` / `auto_sync_max_size_gb` | `0` / `0` | 体积上下限（0 表示不限制；体积取自 115 分享解析） |
+| `auto_sync_max_per_run` | `3` | 单个订阅每次最多转存多少个资源 |
 
 ## 插件数据（宿主 KV）
 
@@ -65,6 +82,7 @@ MoviePilot V3 插件（`plugins.v3/panbox`），界面为 Vue 联邦组件 + 主
 |:---|:---|
 | `search_history` | 历史记录数组，元素含 `id` / `created_at` / `source`(`search`\|`transfer`) / `item` |
 | `favorites` | 收藏数组，元素含 `id` / `created_at` / `note` / `item` |
+| `subscriptions` | 订阅数组，元素含 `id`/`title`/`media_type`/`media_id`/`season`/`enabled`/过滤项/`last_*`/`transferred[]`/`seen[]` |
 
 ## 前端（Vue 联邦）
 
@@ -124,5 +142,6 @@ cd plugins.v3/panbox/frontend && npm install && npm run build
 
 | 版本 | 说明 |
 |:---|:---|
+| v0.2.0 | 侧栏改为复用宿主菜单分组（探索→网盘资源、订阅→电影/剧集）；新增豆瓣/TMDB 双榜单与海报网格、频道页签资源详情、订阅实体与定时自动搜索+转存引擎、中文季号识别 |
 | v0.1.1 | 重设计设置面板（左侧分组导航、固定高度外壳、紧凑行式布局、字号 11~13px）；新增「转存前分享预览」只读接口 `/drive/preview`；修复本地调试台 Vuetify 组件未注册 |
 | v0.1.0 | 首个版本：TG 频道资源搜索、115 转存、网盘账号管理、搜索历史与收藏、侧栏整页入口 |

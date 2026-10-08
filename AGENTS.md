@@ -189,11 +189,14 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.2 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
+| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.2.0 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
 
 `PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
 - **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
 - **本仓库许可证：暂不加**（版权保留）。若日后复用 GPL-3.0 项目代码，PanBox 须整体以 GPL-3.0 发布。
+- **侧栏架构（v0.2.0 起，复用宿主菜单分组）**：`resource`→`section=discovery`（落在「探索」分组，`AppPageResource`：豆瓣/TMDB 双榜单 + 海报网格 + 详情频道页签）；`movie`/`tv`→`section=subscribe`（落在「订阅」分组，`AppPageMovie`/`AppPageTv`，仿宿主「订阅→电影/电视剧」）；`main`→`section=system`（管理页）。宿主前端按 `./AppPage{PascalCase(nav_key)}` 解析非 main 页，故 `vite.config.js` 需逐个 expose。
+- **榜单实现**：复用宿主链 `DoubanChain.async_douban_discover` / `TmdbChain.async_tmdb_discover`（与宿主「探索」页同源同参）；媒体搜索用 `MediaChain.async_search_medias`。榜单参数为实例实测可用值（豆瓣 sort=R/T/S、tags=豆瓣高分；TMDB sort_by=popularity.desc / vote_average.desc + vote_count）。
+- **订阅实现（全自动）**：订阅存宿主 KV 键 `subscriptions`；`get_service()` 注册 cron 服务（`CronTrigger.from_crontab(auto_sync_cron)`，仅在 `auto_sync_enabled` + 115 已启用时注册）；同步流程为「频道搜索 → 网盘类型/季号/关键词/体积筛选 → 优选 → 转存 → 记录」，体积取自 115 `share/snap` 真实解析，`transferred`/`seen` 双去重。
 - **搜索实现**：自建抓取 `https://t.me/s/<频道>?q=<关键词>` 公开预览页，用宿主自带的 beautifulsoup4 解析；频道列表由插件配置（默认 5 个）。已实测：真实频道能命中并解析出网盘链接与提取码。Telegram 站内搜索为模糊匹配，需按 `search_filter` 做后置过滤。
 - **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
 - **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
@@ -209,7 +212,8 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
   - ✅ **115 读接口已用真实 Cookie 验证**：`/drive/check` 返回「115 Cookie 可用」；`/drive/folders` 能列出根目录与配置的目标目录（真实网盘内容，100 个子目录）；`/drive/preview` 能解析真实分享（含体积，实测一条 106GB Remux），并能把 115 的真实错误（如「分享已取消」）转为可读提示。
 - **尚未验证（勿当作已可用）**：
   1. **115 写入（`share/receive`）仍未实测**——需要一条体积可接受的 115 分享（现有搜索到的资源均为 20GB~180GB，未擅自写入用户网盘）；
-  2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，目前仅 115。
+  2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，自动转存仅 115；
+  3. v0.2.0 的四入口侧栏与订阅链路**尚未在实例验证**（`resource`/`movie`/`tv` 三个新页面的 `AppPage{PascalCase}` 解析、榜单接口、订阅增删与「立即搜索」均待真机确认）。
 - **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。

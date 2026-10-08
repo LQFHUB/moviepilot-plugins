@@ -152,14 +152,19 @@ def test_渲染模式为_vue_联邦(plugin: PanBox) -> None:
 
 
 def test_侧栏项满足宿主校验规则(plugin: PanBox) -> None:
-    """nav_key 不得含 /?# 与空格，section/permission 必须在宿主白名单内。"""
+    """四个入口分别落在探索/订阅/系统分组；nav_key 与 section 必须合法。"""
     nav = plugin.get_sidebar_nav()
-    assert len(nav) == 1
-    item = nav[0]
-    assert item["nav_key"] == "main"
-    assert item["section"] in {"start", "discovery", "subscribe", "organize", "system"}
-    assert item["permission"] in {"subscribe", "discovery", "search", "manage", "admin"}
-    assert not any(character in item["nav_key"] for character in "/?# ")
+    assert [item["nav_key"] for item in nav] == ["resource", "movie", "tv", "main"]
+    sections = {item["nav_key"]: item["section"] for item in nav}
+    assert sections["resource"] == "discovery"
+    assert sections["movie"] == "subscribe"
+    assert sections["tv"] == "subscribe"
+    assert sections["main"] == "system"
+    for item in nav:
+        assert item["section"] in {"start", "discovery", "subscribe", "organize", "system"}
+        assert item["permission"] in {"subscribe", "discovery", "search", "manage", "admin"}
+        assert not any(character in item["nav_key"] for character in "/?# ")
+        assert item["title"]
 
 
 def test_未启用时不下发侧栏入口() -> None:

@@ -17,8 +17,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.sdk.plugin import _PluginBase
 
 from .core.config import DEFAULT_CONFIG, build_config
+from .core.media import RANK_TABS, MediaCatalog
 from .core.models import parse_share_url
 from .core.storage import PanBoxStore
+from .core.subscription import SubscriptionStore
+from .core.sync import SubscriptionSyncer
 from .core.tg import ChannelSearcher
 from .drive.p115 import P115Client, P115Error
 
@@ -31,7 +34,7 @@ class PanBox(_PluginBase):
     plugin_name = "网盘助手"
     plugin_desc = "自建 Telegram 频道资源搜索，并把网盘分享一键转存到自己的网盘。"
     plugin_icon = "panbox.png"
-    plugin_version = "0.1.2"
+    plugin_version = "0.2.0"
     plugin_order = 100
 
     def __init__(self) -> None:
@@ -39,6 +42,8 @@ class PanBox(_PluginBase):
         super().__init__()
         self._config: Dict[str, Any] = dict(DEFAULT_CONFIG)
         self._store = PanBoxStore(self, history_limit=int(DEFAULT_CONFIG["history_limit"]))
+        self._subs = SubscriptionStore(self)
+        self._catalog = MediaCatalog()
 
     # ------------------------------------------------------------ 生命周期
     def init_plugin(self, config: Optional[Dict[str, Any]] = None) -> None:
@@ -49,6 +54,7 @@ class PanBox(_PluginBase):
         self.stop_service()
         self._config = build_config(config)
         self._store = PanBoxStore(self, history_limit=int(self._config.get("history_limit") or 500))
+        self._subs = SubscriptionStore(self)
 
     def get_state(self) -> bool:
         """获取插件启用状态。"""
@@ -73,18 +79,48 @@ class PanBox(_PluginBase):
         return None
 
     def get_sidebar_nav(self) -> List[Dict[str, Any]]:
-        """声明主界面侧栏整页入口（仅启用的 Vue 插件会被聚合）。"""
+        """声明主界面侧栏整页入口（仅启用的 Vue 插件会被聚合）。
+
+        刻意复用宿主自带菜单的分组语义：
+        - ``section="discovery"`` → 落在「探索」分组（网盘资源搜索，与探索页同参同源）；
+        - ``section="subscribe"`` → 落在「订阅」分组（电影 / 剧集各一个入口，仿「订阅 → 电影/电视剧」）；
+        - ``section="system"`` → 落在「系统」分组（本插件的管理页：历史 / 收藏 / 账号）。
+        """
         if not self.get_state():
             return []
         return [
             {
-                "nav_key": "main",
-                "title": self.plugin_name,
+                "nav_key": "resource",
+                "title": "网盘资源",
                 "icon": "mdi-cloud-search-outline",
+                "section": "discovery",
+                "permission": "discovery",
+                "order": 30,
+            },
+            {
+                "nav_key": "movie",
+                "title": "网盘电影订阅",
+                "icon": "mdi-movie-open-outline",
+                "section": "subscribe",
+                "permission": "subscribe",
+                "order": 31,
+            },
+            {
+                "nav_key": "tv",
+                "title": "网盘剧集订阅",
+                "icon": "mdi-television-classic",
+                "section": "subscribe",
+                "permission": "subscribe",
+                "order": 32,
+            },
+            {
+                "nav_key": "main",
+                "title": "网盘助手",
+                "icon": "mdi-cloud-cog-outline",
                 "section": "system",
                 "permission": "manage",
                 "order": 10,
-            }
+            },
         ]
 
     # ------------------------------------------------------------ 插件 API
@@ -174,6 +210,69 @@ class PanBox(_PluginBase):
                 "methods": ["POST"],
                 "auth": "bear",
                 "summary": "删除收藏",
+            },
+            {
+                "path": "/discover/tabs",
+                "endpoint": self.api_discover_tabs,
+                "methods": ["GET"],
+                "auth": "bear",
+                "summary": "获取网盘资源的榜单页签（复用探索的豆瓣/TMDB）",
+            },
+            {
+                "path": "/discover/rank",
+                "endpoint": self.api_discover_rank,
+                "methods": ["GET"],
+                "auth": "bear",
+                "summary": "按页签获取榜单条目",
+            },
+            {
+                "path": "/media/search",
+                "endpoint": self.api_media_search,
+                "methods": ["GET"],
+                "auth": "bear",
+                "summary": "按标题搜索媒体（多源）",
+            },
+            {
+                "path": "/media/resources",
+                "endpoint": self.api_media_resources,
+                "methods": ["GET"],
+                "auth": "bear",
+                "summary": "按标题在频道中检索网盘资源（按频道分组）",
+            },
+            {
+                "path": "/subscriptions",
+                "endpoint": self.api_subscriptions,
+                "methods": ["GET"],
+                "auth": "bear",
+                "summary": "按类型获取网盘订阅列表",
+            },
+            {
+                "path": "/subscriptions/add",
+                "endpoint": self.api_subscription_add,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "新增网盘订阅",
+            },
+            {
+                "path": "/subscriptions/update",
+                "endpoint": self.api_subscription_update,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "更新网盘订阅",
+            },
+            {
+                "path": "/subscriptions/delete",
+                "endpoint": self.api_subscription_delete,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "删除网盘订阅",
+            },
+            {
+                "path": "/subscriptions/run",
+                "endpoint": self.api_subscription_run,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "立即执行网盘订阅同步",
             },
         ]
 
@@ -458,3 +557,222 @@ class PanBox(_PluginBase):
         if not record_id:
             return {"success": False, "message": "缺少收藏 ID"}
         return {"success": self._store.remove_favorite(record_id), "message": "已删除"}
+
+    # ------------------------------------------------- 榜单 / 媒体（网盘资源页）
+    def api_discover_tabs(self) -> Dict[str, Any]:
+        """返回「网盘资源」页的榜单页签定义（复用宿主探索的豆瓣 / TMDB 数据源）。"""
+        return {"success": True, "data": RANK_TABS}
+
+    async def api_discover_rank(
+        self,
+        key: str = "douban_movie",
+        sort: str = "",
+        page: int = 1,
+        count: int = 24,
+    ) -> Dict[str, Any]:
+        """按页签获取榜单条目。
+
+        :param key: 页签 key（见 ``RANK_TABS``）
+        :param sort: 排序取值；为空用该页签默认
+        :param page: 页码
+        :param count: 每页条数
+        :return: 榜单条目
+        """
+        if not self.get_state():
+            return {"success": False, "message": "插件未启用"}
+        try:
+            items = await self._catalog.rank_items(key, sort_value=sort, page=page, count=count)
+        except Exception as error:  # noqa: BLE001 - 宿主链异常需回传可读信息
+            return {"success": False, "message": f"获取榜单失败：{type(error).__name__}: {error}"}
+        return {"success": True, "data": items, "page": page, "count": len(items)}
+
+    async def api_media_search(self, keyword: str = "", media_type: str = "") -> Dict[str, Any]:
+        """按标题搜索媒体，用于把资源与标准影视条目对齐。
+
+        :param keyword: 标题关键词
+        :param media_type: 可选类型过滤（``movie``/``tv``）
+        :return: 媒体条目
+        """
+        if not self.get_state():
+            return {"success": False, "message": "插件未启用"}
+        try:
+            items = await self._catalog.search(keyword, media_type=media_type)
+        except Exception as error:  # noqa: BLE001
+            return {"success": False, "message": f"媒体搜索失败：{type(error).__name__}: {error}"}
+        return {"success": True, "data": items, "count": len(items)}
+
+    def api_media_resources(self, title: str = "", media_type: str = "", season: int = 0) -> Dict[str, Any]:
+        """按标题在频道中检索网盘资源，并按频道分组返回（供详情对话框的频道页签）。
+
+        :param title: 影视标题
+        :param media_type: 可选类型提示（``movie``/``tv``）
+        :param season: 剧集季号，``0`` 表示不过滤
+        :return: 按频道分组的资源
+        """
+        if not self.get_state():
+            return {"success": False, "message": "插件未启用"}
+        text = (title or "").strip()
+        if not text:
+            return {"success": False, "message": "缺少标题"}
+        searcher = ChannelSearcher(
+            base_url=str(self._config.get("search_base_url") or "https://t.me/s"),
+            timeout=int(self._config.get("search_timeout") or 20),
+            proxy=str(self._config.get("search_proxy") or "") or None,
+        )
+        result = searcher.search(
+            keyword=text,
+            channels=self._config.get("channels") or DEFAULT_CONFIG["channels"],
+            limit=int(self._config.get("search_limit") or 30),
+            filter_by_keyword=bool(self._config.get("search_filter")),
+        )
+        channels: Dict[str, Dict[str, Any]] = {}
+        for item in result.get("items") or []:
+            channel_id = str(item.get("channel_id") or "")
+            bucket = channels.setdefault(
+                channel_id,
+                {"channel_id": channel_id, "channel_name": item.get("channel_name") or channel_id, "items": []},
+            )
+            bucket["items"].append(item)
+        grouped = sorted(channels.values(), key=lambda entry: len(entry["items"]), reverse=True)
+        return {
+            "success": True,
+            "title": text,
+            "media_type": media_type,
+            "season": season,
+            "channels": grouped,
+            "total": sum(len(entry["items"]) for entry in grouped),
+            "errors": result.get("errors") or [],
+        }
+
+    # ------------------------------------------------------------- 网盘订阅
+    def api_subscriptions(self, media_type: str = "") -> Dict[str, Any]:
+        """按类型获取订阅列表。
+
+        :param media_type: ``movie`` / ``tv``；为空表示全部
+        :return: 订阅列表
+        """
+        items = [item.to_dict() for item in self._subs.list_by_type(media_type or None)]
+        return {"success": True, "data": items, "count": len(items)}
+
+    def api_subscription_add(self, payload: Optional[dict] = None) -> Dict[str, Any]:
+        """新增订阅（同一媒体重复订阅会被拒绝）。
+
+        :param payload: 请求体，含 ``title`` / ``media_type`` / 海报等
+        :return: 新增结果
+        """
+        data = dict(payload or {})
+        title = str(data.get("title") or "").strip()
+        if not title:
+            return {"success": False, "message": "缺少标题"}
+        media_type = str(data.get("media_type") or "movie").lower()
+        if media_type not in ("movie", "tv"):
+            return {"success": False, "message": "媒体类型必须是 movie 或 tv"}
+        media_id = str(data.get("media_id") or "")
+        if media_id and self._subs.find_by_media(media_id, media_type):
+            return {"success": False, "message": "该条目已在订阅列表中"}
+        subscription = self._subs.add({**data, "title": title, "media_type": media_type})
+        return {"success": True, "message": "订阅已添加", "data": subscription.to_dict()}
+
+    def api_subscription_update(self, payload: Optional[dict] = None) -> Dict[str, Any]:
+        """更新订阅（启停、季号、过滤词、体积上下限）。
+
+        :param payload: 请求体，含 ``id`` 与待更新字段
+        :return: 更新结果
+        """
+        data = dict(payload or {})
+        subscription_id = str(data.get("id") or "")
+        if not subscription_id:
+            return {"success": False, "message": "缺少订阅 ID"}
+        patch = {key: value for key, value in data.items() if key != "id"}
+        updated = self._subs.update(subscription_id, patch)
+        if updated is None:
+            return {"success": False, "message": "订阅不存在"}
+        return {"success": True, "message": "已更新", "data": updated.to_dict()}
+
+    def api_subscription_delete(self, payload: Optional[dict] = None) -> Dict[str, Any]:
+        """删除订阅。
+
+        :param payload: 请求体，含 ``id``
+        :return: 删除结果
+        """
+        subscription_id = str((payload or {}).get("id") or "")
+        if not subscription_id:
+            return {"success": False, "message": "缺少订阅 ID"}
+        return {"success": self._subs.delete(subscription_id), "message": "已删除"}
+
+    def api_subscription_run(self, payload: Optional[dict] = None) -> Dict[str, Any]:
+        """立即执行订阅同步（搜索 + 转存）。
+
+        :param payload: 请求体，可含 ``id``（只跑一个）或 ``media_type``
+        :return: 执行结果
+        """
+        if not self.get_state():
+            return {"success": False, "message": "插件未启用"}
+        data = dict(payload or {})
+        return self.run_subscription_sync(
+            subscription_id=str(data.get("id") or ""),
+            media_type=str(data.get("media_type") or ""),
+        )
+
+    # --------------------------------------------------------- 定时同步服务
+    def run_subscription_sync(self, subscription_id: str = "", media_type: str = "") -> Dict[str, Any]:
+        """执行订阅同步（供定时服务与「立即执行」共用）。
+
+        :param subscription_id: 只执行指定订阅
+        :param media_type: 只执行指定类型
+        :return: 执行结果
+        """
+        if not self._config.get("p115_enabled"):
+            return {"success": False, "message": "115 网盘未启用，无法自动转存"}
+        syncer = SubscriptionSyncer(self._config, self._subs, on_transferred=self._on_subscription_transferred)
+        return syncer.run_all(subscription_id=subscription_id, media_type=media_type)
+
+    def _on_subscription_transferred(self, subscription: Any, record: Dict[str, Any]) -> None:
+        """把自动转存结果写入历史，便于审计。
+
+        :param subscription: 订阅对象
+        :param record: 转存记录
+        """
+        if not self._config.get("history_auto_record"):
+            return
+        self._store.add_history(
+            {
+                "channel_id": record.get("channel_id") or "",
+                "channel_name": "",
+                "message_id": record.get("message_id") or "",
+                "title": record.get("title") or subscription.title,
+                "content": f"订阅自动转存：{subscription.title}",
+                "pub_date": "",
+                "cloud_links": [{"cloud_type": "p115", "url": record.get("url") or "", "receive_code": ""}],
+            },
+            source="transfer",
+        )
+
+    def get_service(self) -> List[Dict[str, Any]]:
+        """声明定时同步服务（仅在开启自动同步且 115 可用时注册）。"""
+        if not self.get_state() or not self._config.get("auto_sync_enabled"):
+            return []
+        if not self._config.get("p115_enabled"):
+            return []
+        trigger: Any = "cron"
+        trigger_kwargs: Dict[str, Any] = {"hour": "*/6", "minute": 10}
+        cron_text = str(self._config.get("auto_sync_cron") or "").strip()
+        if cron_text:
+            try:
+                from apscheduler.triggers.cron import CronTrigger
+
+                trigger = CronTrigger.from_crontab(cron_text)
+                trigger_kwargs = {}
+            except Exception:  # noqa: BLE001 - 表达式非法时退回每 6 小时
+                trigger = "cron"
+                trigger_kwargs = {"hour": "*/6", "minute": 10}
+        return [
+            {
+                "id": "auto_sync",
+                "name": "网盘订阅自动同步",
+                "trigger": trigger,
+                "func": self.run_subscription_sync,
+                "kwargs": trigger_kwargs,
+                "func_kwargs": {},
+            }
+        ]

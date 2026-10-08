@@ -70,6 +70,10 @@ export default defineConfig({
         './Config': './src/components/Config.vue',
         './Page': './src/components/Page.vue',
         './AppPage': './src/components/AppPage.vue',
+        // 宿主按 `./AppPage{PascalCase(nav_key)}` 解析非 main 的侧栏页
+        './AppPageResource': './src/components/AppPageResource.vue',
+        './AppPageMovie': './src/components/AppPageMovie.vue',
+        './AppPageTv': './src/components/AppPageTv.vue',
       },
       shared: {
         // 由宿主提供运行时，插件侧不重复打包（generate: false）

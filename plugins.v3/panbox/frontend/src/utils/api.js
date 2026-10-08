@@ -90,5 +90,23 @@ export function createPanBoxApi(api) {
     favorites: () => get('favorites'),
     favoriteAdd: (item, note = '') => post('favorites/add', { item, note }),
     favoriteDelete: (id) => post('favorites/delete', { id }),
+    /** 榜单页签定义（复用探索的豆瓣 / TMDB 两个数据源） */
+    discoverTabs: () => get('discover/tabs'),
+    /** 榜单条目：{ key, sort, page, count } */
+    discoverRank: (params) => get('discover/rank', params),
+    /** 媒体搜索：{ keyword, media_type } */
+    mediaSearch: (params) => get('media/search', params),
+    /** 某标题在频道中的网盘资源（按频道分组）：{ title, media_type, season } */
+    mediaResources: (params) => get('media/resources', params),
+    /** 订阅列表：{ media_type } */
+    subscriptions: (mediaType = '') => get('subscriptions', mediaType ? { media_type: mediaType } : undefined),
+    /** 新增订阅 */
+    subscriptionAdd: (payload) => post('subscriptions/add', payload),
+    /** 更新订阅 */
+    subscriptionUpdate: (payload) => post('subscriptions/update', payload),
+    /** 删除订阅 */
+    subscriptionDelete: (id) => post('subscriptions/delete', { id }),
+    /** 立即执行订阅同步：{ id?, media_type? } */
+    subscriptionRun: (payload = {}) => post('subscriptions/run', payload),
   }
 }
