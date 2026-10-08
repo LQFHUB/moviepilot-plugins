@@ -184,7 +184,7 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.0 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
+| `PanBox` | `plugins.v3/panbox` | 网盘助手 | 0.1.2 | vue 联邦 | 联调中 | 自建 TG 频道资源搜索 + 转存到网盘 + 网盘账号管理 + 搜索历史/收藏 + 侧栏整页入口；**不做**榜单自动订阅/站点签到/整理刮削STRM/通知与媒体库刷新/Agent 工具 |
 
 `PanBox` 详情（完整信息见 `plugins.v3/panbox/README.md`）：
 - **参考来源**：`CloudSubscribe`（网盘订阅助手，**两版均为 GPL-3.0**，仅参考功能边界与接口事实，**禁止复制其代码**）、`CloudSaver`（`jiangrui1994/cloudsaver`，MIT，参考 TG 抓取思路与网盘链接分类；其开源版为 V0.2.5、线上镜像 0.9.1，能力差异大）。
@@ -193,16 +193,18 @@ python -m compileall -q plugins.v3/<plugin_id_lower>
 - **转存实现**：115 网盘，自研 HTTP 驱动（`drive/p115.py`，走 `https://webapi.115.com` 的 `share/snap`、`files`、`share/receive`）。**不引入 `p115client`**：宿主无该库，且共享环境已有插件做过依赖钉版，新增依赖有冲突风险（详见 README「依赖」）。
 - **持久化**：历史与收藏走宿主 `save_data`/`get_data`（键 `search_history`、`favorites`），未自建数据库。
 - **校验命令**：`python -m compileall -q plugins.v3/panbox`；`python -m pytest plugins.v3/panbox/tests -q`（17 项测试，已通过）；`cd plugins.v3/panbox/frontend && npm run build`（构建末尾自动校验 `dist/assets` 产物完整性）。
-- **实例联调结果（2026-10-08，已在 `192.168.31.200:3000` 安装并启用）**：
-  - ✅ 已安装（v0.1.0，`has_page=True`、`runtime_compatible=True`），已启用；宿主侧栏 `sidebar_nav` 唯一入口即 PanBox（`nav_key=main`、`section=system`、`permission=manage`）。
-  - ✅ 联邦组件已注册：`/plugin/file/panbox/dist/assets/remoteEntry.js?v=0.1.0`，与本地构建产物 sha256 **一致**；entry 引用的 8 个 js/css 由实例返回 **全部 200**。
+- **实例联调结果（2026-10-08，已在 `192.168.31.200:3000` 安装并启用；当前 v0.1.2）**：
+  - ✅ 已安装（`has_page=True`、`runtime_compatible=True`），已启用；宿主侧栏 `sidebar_nav` 唯一入口即 PanBox（`nav_key=main`、`section=system`、`permission=manage`）。
+  - ✅ 联邦组件已注册：`/plugin/file/panbox/dist/assets/remoteEntry.js?v=<版本>`，与本地构建产物 sha256 **一致**；entry 引用的 10 个 js/css 由实例返回 **全部 200**。
   - ✅ 浏览器实测（真实宿主前端 v3.1.2，admin 登录）：侧栏「网盘助手」→ `#/plugin-app/PanBox/main` 正常渲染；四个页签（搜索/历史/收藏/账号）均正常；插件卡片详情对话框（`Page.vue`）正常；插件市场列表卡片显示名称/版本/描述/作者。
+  - ✅ **配置面板已在宿主 UI 中打开验证**（路径：`#/plugins` → PanBox 卡片菜单 → Settings）：分组导航（插件运行 / 网盘与数据）、四个分类、状态 chips、统计与底栏均按设计渲染，跟随宿主主题。
   - ✅ UI 内真实搜索成功：关键词「流浪地球」跨 5 频道返回 **19 条 / 9261ms**，卡片正确显示频道、时间、网盘类型、提取码、复制/收藏/原消息链接。
   - ✅ 失败路径有可读提示：点击「转存到115」弹出 snackbar「115 网盘未启用（请在插件配置中开启）」。
-  - ✅ API 层：`meta`/`search`/`history`(自动记录 19 条)/`favorites`(增·去重·删)/`drive.*` 失败路径 全部符合预期；零凭证泄露（提交内容与前端代码均未含 Token）。
+  - ✅ API 层：`meta`/`search`/`history`/`favorites`/`drive.*` 均符合预期；零凭证泄露（提交内容与前端代码均未含 Token）。
+  - ✅ **115 读接口已用真实 Cookie 验证**：`/drive/check` 返回「115 Cookie 可用」；`/drive/folders` 能列出根目录与配置的目标目录（真实网盘内容，100 个子目录）；`/drive/preview` 能解析真实分享（含体积，实测一条 106GB Remux），并能把 115 的真实错误（如「分享已取消」）转为可读提示。
 - **尚未验证（勿当作已可用）**：
-  1. **115 转存链路仍未经真实 Cookie 验证**——需要用户先在插件设置页填入 115 Cookie 并开启 115，才能实测 `share/snap`、`files`、`share/receive` 全链路；
-  2. **配置对话框（`Config.vue`）未在宿主 UI 中打开验证**——其 expose 已注册、资源可取（200），且已由协议级冒烟测试覆盖，但宿主「设置 → 插件 → 网盘助手 → 设置」的真实打开路径未跑通（虚拟列表内按钮难以稳定点击）。
+  1. **115 写入（`share/receive`）仍未实测**——需要一条体积可接受的 115 分享（现有搜索到的资源均为 20GB~180GB，未擅自写入用户网盘）；
+  2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，目前仅 115。
 - **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。

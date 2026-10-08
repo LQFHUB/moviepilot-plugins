@@ -212,11 +212,14 @@ class P115Client:
 
     # ------------------------------------------------------------------ 便捷
     def transfer_url(self, url: str, cid: str = "0") -> Dict[str, Any]:
-        """按分享链接直接转存（自动解析分享码、提取码与文件）。
+        """按分享链接转存分享根目录下的**全部**条目。
+
+        `share/receive` 每次只接受一个 `file_id`，因此对分享根目录的每个条目各调用一次；
+        分享根目录只有一个文件夹时即为一次调用（常见情况）。
 
         :param url: 网盘分享链接
         :param cid: 目标目录 ID
-        :return: 含 ``ok`` / ``message`` / ``files`` 的字典
+        :return: 含 ``ok`` / ``message`` / ``files`` / ``transferred`` 的字典
         """
         parsed = parse_share_url(url)
         if not parsed or parsed.get("cloud_type") != "p115":
@@ -224,17 +227,32 @@ class P115Client:
         files = self.share_info(parsed["share_code"], parsed["receive_code"])
         if not files:
             return {"ok": False, "message": "分享内没有可转存的文件"}
-        first = files[0]
-        result = self.save(
-            share_code=parsed["share_code"],
-            receive_code=parsed["receive_code"],
-            file_id=first["file_id"],
-            cid=cid,
-        )
+        transferred: List[Dict[str, Any]] = []
+        failures: List[str] = []
+        for item in files:
+            try:
+                result = self.save(
+                    share_code=parsed["share_code"],
+                    receive_code=parsed["receive_code"],
+                    file_id=item["file_id"],
+                    cid=cid,
+                )
+            except P115Error as error:
+                failures.append(f"{item.get('file_name') or item.get('file_id')}: {error}")
+                continue
+            transferred.append({"file_id": item["file_id"], "file_name": item.get("file_name", ""), "message": result["message"]})
+        ok = bool(transferred)
+        if failures and ok:
+            message = f"部分转存成功（{len(transferred)}/{len(files)}），失败：{'；'.join(failures)}"
+        elif failures:
+            message = f"转存失败：{'；'.join(failures)}"
+        else:
+            message = f"转存成功（{len(transferred)} 个条目）"
         return {
-            "ok": result["ok"],
-            "message": result["message"],
+            "ok": ok,
+            "message": message,
             "share_code": parsed["share_code"],
-            "file_name": first["file_name"],
+            "file_name": (transferred[0]["file_name"] if transferred else (files[0].get("file_name") or "")),
+            "transferred": transferred,
             "files": files,
         }
