@@ -209,11 +209,14 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
   - ✅ UI 内真实搜索成功：关键词「流浪地球」跨 5 频道返回 **19 条 / 9261ms**，卡片正确显示频道、时间、网盘类型、提取码、复制/收藏/原消息链接。
   - ✅ 失败路径有可读提示：点击「转存到115」弹出 snackbar「115 网盘未启用（请在插件配置中开启）」。
   - ✅ API 层：`meta`/`search`/`history`/`favorites`/`drive.*` 均符合预期；零凭证泄露（提交内容与前端代码均未含 Token）。
+  - ✅ **四入口侧栏已在真机验证**：`sidebar_nav` 返回 4 项且分组正确（`resource`→discovery、`movie`/`tv`→subscribe、`main`→system）；宿主前端按 `./AppPage{PascalCase(nav_key)}` 成功加载 `#/plugin-app/PanBox/resource` 与 `.../movie`（`AppPageResource`/`AppPageMovie` 均在页内渲染）。
+  - ✅ **网盘资源页（复用探索榜单）已在真机验证**：4 个榜单页签（豆瓣电影/剧集、TMDB 电影/剧集）+ 排序 + 海报网格 30 张；榜单数据来自宿主 `DoubanChain`/`TmdbChain`。
+  - ✅ **豆瓣海报 418 防盗链已修复**：海报统一改走宿主同源图片代理 `GET /api/v1/system/img/false?imgurl=<url>`（需登录 Cookie 携带 resource token）；修复后 30/30 张加载成功，控制台错误由 33 条降至 1 条（仅宿主自身 Google Fonts）。
   - ✅ **115 读接口已用真实 Cookie 验证**：`/drive/check` 返回「115 Cookie 可用」；`/drive/folders` 能列出根目录与配置的目标目录（真实网盘内容，100 个子目录）；`/drive/preview` 能解析真实分享（含体积，实测一条 106GB Remux），并能把 115 的真实错误（如「分享已取消」）转为可读提示。
 - **尚未验证（勿当作已可用）**：
   1. **115 写入（`share/receive`）仍未实测**——需要一条体积可接受的 115 分享（现有搜索到的资源均为 20GB~180GB，未擅自写入用户网盘）；
   2. 多网盘支持（夸克/阿里/天翼/123 等）尚未实现，自动转存仅 115；
-  3. v0.2.0 的四入口侧栏与订阅链路**尚未在实例验证**（`resource`/`movie`/`tv` 三个新页面的 `AppPage{PascalCase}` 解析、榜单接口、订阅增删与「立即搜索」均待真机确认）。
+  3. **订阅链路的「自动转存」尚未在实例跑通**（订阅增删、`/subscriptions/run` 接口与 cron 服务注册已就绪，但真实自动转存依赖 `share/receive` 写入，见第 1 条）。
 - **已知设计取舍**：Telegram 站内搜索是模糊匹配，命中率取决于频道与关键词，故提供 `search_filter` 后置过滤开关；历史记录按「来源 + 资源」去重，避免重复搜索堆积；**不提供网络代理设置**（实测容器可直连 `t.me`，豆瓣图片走宿主同源图片代理 `/api/v1/system/img/false?imgurl=`，无需代理）。
 
 状态取值：`规划中` / `开发中` / `联调中` / `已发布` / `已下线`。
