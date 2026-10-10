@@ -1,7 +1,7 @@
 <template>
   <v-dialog
     v-model="model"
-    max-width="960"
+    max-width="1320"
     :fullscreen="fullscreen"
     transition="dialog-bottom-transition"
     class="resource-detail-dialog">
@@ -408,9 +408,11 @@
               <span v-if="group.subtitle" class="resource-group-subtitle">{{ group.subtitle }}</span>
               <span class="resource-group-count">{{ group.items.length }}</span>
             </div>
+            <!-- 折叠必须用 v-if 真正卸载条目：.resource-row-item 带 display:flex !important，
+                 v-show 写入的行内 display:none 会被样式表覆盖，导致「箭头折叠、条目照旧渲染」 -->
+            <template v-if="isGroupExpanded(group.key)">
             <div
               v-for="({res, idx}) in group.items"
-              v-show="isGroupExpanded(group.key)"
               :key="resKey(res, idx)"
               class="resource-row-item">
             <div class="resource-row-header d-flex align-center justify-space-between ga-2">
@@ -564,6 +566,7 @@
               </span>
             </div>
             </div>
+            </template>
           </template>
         </div>
       </div>
@@ -767,7 +770,10 @@ function toggleGroup(key) {
   expandedGroupKeys.value = next;
 }
 
-/** 判断某个来源分组当前是否展开（无分组信息的平铺渠道恒为展开）。 */
+/**
+ * 判断某个来源分组当前是否展开：无分组信息的平铺渠道恒为展开。
+ * 分组头箭头方向、`aria-expanded` 与条目是否渲染都只调用本函数，保证三者同源。
+ */
 function isGroupExpanded(key) {
   return !key || expandedGroupKeys.value.has(key);
 }
@@ -934,11 +940,11 @@ const closeMediaDetail = () => {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: min(1060px, calc(100vw - 48px)) !important;
-  max-width: min(1060px, calc(100vw - 48px)) !important;
-  height: min(760px, calc(90vh - 32px)) !important;
-  min-height: min(680px, calc(86vh - 32px)) !important;
-  max-height: min(840px, calc(92vh - 20px)) !important;
+  width: min(1320px, calc(100vw - 40px)) !important;
+  max-width: min(1320px, calc(100vw - 40px)) !important;
+  height: min(880px, calc(93vh - 24px)) !important;
+  min-height: min(720px, calc(88vh - 24px)) !important;
+  max-height: min(980px, calc(95vh - 16px)) !important;
   margin: auto !important;
   overflow: hidden !important;
   border-radius: var(--app-overlay-radius, 18px) !important;
