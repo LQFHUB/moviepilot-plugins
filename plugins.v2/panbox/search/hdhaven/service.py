@@ -16,6 +16,7 @@ from .resource import (
     valid_share_url,
 )
 from ..budget import PointBudgetLedger
+from ..matching import infer_candidate_media_type
 from ..types import SUPPORTED_CLOUD_TYPES
 from ...core import OwnerDelegator, SearchQuery, format_search_label
 from ...core.media import tmdb_id_of
@@ -199,7 +200,11 @@ class HDHavenSearchService(OwnerDelegator):
             item["target_episodes"] = target_episodes
             item["target_episode_air_dates"] = target_episode_air_dates
             item["subscribe_id"] = subscribe_id
-            item["media_type"] = type_str
+            # 类型判定：HDHaven 按 TMDB 类型直达查询，站点本身不返回类型列，
+            # 因此先按标题季集标记/关键词推断，无线索时才记录为搜索意图来源。
+            item.update(infer_candidate_media_type(
+                item, query_media_type=type_str,
+            ))
             item["preview_episodes_authoritative"] = bool(item.get("preview_episodes"))
             filtered_results.append(item)
 

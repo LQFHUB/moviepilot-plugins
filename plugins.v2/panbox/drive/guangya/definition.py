@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Optional
 
 from .client import GuangyaClient
 from .provider import GuangyaDrive, create_guangya_provider
-from ...core.definitions import DriverDefinition, FieldSpec, GroupSpec
+from ...core.definitions import (
+    DriverDefinition, FieldSpec, GroupSpec,
+    media_type_transfer_fields,
+)
 
 
 class GuangyaDriverDefinition(DriverDefinition):
@@ -75,6 +78,9 @@ class GuangyaDriverDefinition(DriverDefinition):
                         drive_provider="guangya",
                         hint="光鸭分享和离线任务先保存到此路径，之后按平台规则整理。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "guangya_transfer_path", "guangya",
                     ),
                     FieldSpec(
                         key="guangya_media_path",

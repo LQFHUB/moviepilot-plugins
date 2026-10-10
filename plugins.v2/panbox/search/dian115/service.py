@@ -10,7 +10,7 @@ from app.schemas.types import MediaType
 from .client import Dian115Client, Dian115Error
 from .resource import Dian115ResourceService
 from ..budget import PointBudgetLedger
-from ..matching import unique_texts
+from ..matching import infer_candidate_media_type, unique_texts
 from ...core import OwnerDelegator, SearchQuery, format_search_label
 from ...core.media import tmdb_id_of
 from ...utils.cache import create_platform_ttl_cache
@@ -253,7 +253,7 @@ class Dian115SearchService(OwnerDelegator):
             or f"Dian115 分享 {share_id}"
         ).strip()
         page_url = f"{Dian115Client.BASE_URL}{resource_path}"
-        return {
+        candidate = {
             "url": url,
             "title": title,
             "description": str(share.get("file_name") or "").strip(),
@@ -296,6 +296,11 @@ class Dian115SearchService(OwnerDelegator):
                 "season": int(target_season or 0),
             },
         }
+        # 类型判定为附加字段：优先按分享文件名/标签推断，无线索时才记为搜索意图来源。
+        candidate.update(infer_candidate_media_type(
+            candidate, query_media_type=media_type,
+        ))
+        return candidate
 
     def search(self, query: SearchQuery) -> Optional[List[Dict[str, Any]]]:
         mediainfo = query.mediainfo

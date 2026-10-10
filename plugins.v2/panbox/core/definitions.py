@@ -142,6 +142,53 @@ def checkin_mode_options(modes: Sequence[str]) -> List[Dict[str, Any]]:
     ]
 
 
+def media_type_transfer_fields(
+        transfer_path_key: str,
+        drive_provider: str,
+        *,
+        extra_hint: str = "",
+) -> List[FieldSpec]:
+    """构建「电影 / 剧集默认转存路径」两个可选的网盘目录字段。
+
+    键名沿用既有 ``<前缀>_transfer_path`` 约定，追加 ``_movie`` / ``_tv`` 后缀，
+    默认空串表示不启用分流：转存时回落到该网盘原有的默认转存路径。
+
+    :param transfer_path_key: 该网盘原有「网盘转存路径」字段键名
+    :param drive_provider: 网盘目录浏览使用的驱动 key（与前端保持一致）
+    :param extra_hint: 追加到字段提示末尾的补充说明（可空）
+    """
+    prefix = (
+        transfer_path_key[:-len("_transfer_path")]
+        if transfer_path_key.endswith("_transfer_path")
+        else transfer_path_key
+    )
+    tail = "留空表示沿用上方「网盘转存路径」；类型判定不出来时同样回落到该默认路径。"
+    if extra_hint:
+        tail = f"{tail}{extra_hint}"
+    return [
+        FieldSpec(
+            key=f"{prefix}_transfer_path_movie",
+            label="电影默认转存路径",
+            type="cloud-directory",
+            placeholder="/",
+            default="",
+            drive_provider=drive_provider,
+            hint=f"仅电影类型资源优先转存到此路径。{tail}",
+            cols=6,
+        ),
+        FieldSpec(
+            key=f"{prefix}_transfer_path_tv",
+            label="剧集默认转存路径",
+            type="cloud-directory",
+            placeholder="/",
+            default="",
+            drive_provider=drive_provider,
+            hint=f"仅剧集类型资源优先转存到此路径。{tail}",
+            cols=6,
+        ),
+    ]
+
+
 @dataclass(frozen=True)
 class CheckinDefinition:
     """签到提供方自描述契约：只描述元数据与表单，执行由 CheckinService 统一负责。"""
@@ -327,6 +374,24 @@ class DriverDefinition:
         for group in cls.get_config_groups():
             for field in group.fields:
                 if field.key.endswith("_media_path"):
+                    return field.key
+        return ""
+
+    @classmethod
+    def get_transfer_movie_path_key(cls) -> str:
+        """返回该驱动「电影默认转存路径」的表单键名；未声明时返回空串。"""
+        for group in cls.get_config_groups():
+            for field in group.fields:
+                if field.key.endswith("_transfer_path_movie"):
+                    return field.key
+        return ""
+
+    @classmethod
+    def get_transfer_tv_path_key(cls) -> str:
+        """返回该驱动「剧集默认转存路径」的表单键名；未声明时返回空串。"""
+        for group in cls.get_config_groups():
+            for field in group.fields:
+                if field.key.endswith("_transfer_path_tv"):
                     return field.key
         return ""
 

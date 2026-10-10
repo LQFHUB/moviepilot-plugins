@@ -11,6 +11,7 @@ from ..magnet import clear_cache, media_titles, normalize_magnets, parse_size_st
 from ..matching import (
     extract_season,
     extract_year,
+    infer_candidate_media_type,
     title_matches,
     unique_texts,
 )
@@ -248,6 +249,16 @@ class SeedHubSearchService:
                 result["target_season"] = (
                     int(season) if identity_verified and season else None
                 )
+        # 类型判定为附加字段：SeedHub 搜索结果 meta 的类型列是最可靠的结构化信号。
+        site_media_type = str(selected.get("media_type") or "").strip()
+        for result in results:
+            if site_media_type:
+                result["site_media_type"] = site_media_type
+            result.update(infer_candidate_media_type(
+                result,
+                channel_media_type=site_media_type,
+                query_media_type=media_type,
+            ))
         return results
 
     def search(self, query: SearchQuery):

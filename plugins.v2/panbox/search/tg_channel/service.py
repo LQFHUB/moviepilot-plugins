@@ -23,6 +23,7 @@ from ..matching import (
     extract_resource_tags,
     extract_season,
     extract_year,
+    infer_candidate_media_type,
     media_aliases,
     normalize_season,
     resource_title_matches,
@@ -643,7 +644,13 @@ class TelegramChannelSearchService:
             title = cls._extract_title(text, titles, expected_season)
             description = cls._description(text)
             size = cls._extract_size(text)
-            tags = extract_resource_tags(text, cls._hashtags(text))
+            # 原始话题标签（如 #电影 / #电视剧）是最直接的媒体类型信号；
+            # extract_resource_tags 会把它们当展示噪音过滤掉，因此在这里单独取原始标签。
+            raw_hashtags = cls._hashtags(text)
+            tags = extract_resource_tags(text, raw_hashtags)
+            media_type_fields = infer_candidate_media_type(
+                {"title": title, "tags": raw_hashtags},
+            )
             for link in cls._message_links(message):
                 password = cls.extract_password(link["url"], text)
                 target = append_share_password(
@@ -671,6 +678,7 @@ class TelegramChannelSearchService:
                     "size": size,
                     "update_time": str(message.get("published") or ""),
                     "tags": list(tags),
+                    **media_type_fields,
                     "group_key": f"tg_channel:{message_channel}",
                     "group_title": channel_name,
                     "group_icon": channel_icon,

@@ -9,7 +9,10 @@ from app.schemas import MediaInfo
 from app.schemas.types import MediaType
 
 from ..magnet import clear_cache, normalize_magnets
-from ..matching import normalize_season
+from ..matching import (
+    infer_candidate_media_type,
+    normalize_season,
+)
 from ..types import PANSOU_RESOURCE_TYPES, normalize_resource_type, resource_type_name
 from ...core import SearchQuery
 
@@ -371,6 +374,12 @@ class PanSouSearchService:
         ]
         candidates = self._round_robin(grouped, limit)
         candidates = normalize_magnets(candidates, "pansou")
+        # 类型判定为附加字段：使用 PanSou 原始标签做「话题标签」优先推断，
+        # 无任何线索时才回落到搜索意图（media_type_source=query）。
+        for candidate in candidates:
+            candidate.update(infer_candidate_media_type(
+                candidate, query_media_type=media_type,
+            ))
         usable = [
             resource for resource in candidates
             if (

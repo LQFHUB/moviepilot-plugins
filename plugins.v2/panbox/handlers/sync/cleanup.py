@@ -442,6 +442,16 @@ class HistoryCleanupService(OwnerDelegator):
             for p in all_transfer_paths.values():
                 if p:
                     protected_paths.add(PurePosixPath(p))
+        # 电影/剧集专属转存路径同样属于受保护目录，避免清理任务误删用户资源。
+        for media_type_paths in (
+                getattr(self, "_cloud_transfer_paths_movie", {}) or {},
+                getattr(self, "_cloud_transfer_paths_tv", {}) or {},
+        ):
+            if not isinstance(media_type_paths, dict):
+                continue
+            for p in media_type_paths.values():
+                if p:
+                    protected_paths.add(PurePosixPath(p))
         for prot in protected_paths:
             prot_str = str(prot).rstrip("/") or "/"
             if not prot_str:

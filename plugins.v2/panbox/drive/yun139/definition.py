@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Optional
 
 from .client import Yun139Client
 from .provider import Yun139Drive, create_yun139_provider
-from ...core.definitions import DriverDefinition, FieldSpec, GroupSpec
+from ...core.definitions import (
+    DriverDefinition, FieldSpec, GroupSpec,
+    media_type_transfer_fields,
+)
 
 
 class Yun139DriverDefinition(DriverDefinition):
@@ -52,6 +55,9 @@ class Yun139DriverDefinition(DriverDefinition):
                         drive_provider="yun139",
                         hint="移动云盘整理任务使用的目标路径，默认根目录。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "yun139_transfer_path", "yun139",
                     ),
                     FieldSpec(
                         key="yun139_media_path",

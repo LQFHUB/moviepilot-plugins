@@ -16,6 +16,7 @@ from ..magnet import (
 from ..matching import (
     extract_season,
     extract_year,
+    infer_candidate_media_type,
     media_aliases,
     resource_title_matches,
     search_keyword_candidates,
@@ -377,6 +378,11 @@ class PiankuResourceService:
             if len(collected) >= limit:
                 break
 
+        # 类型判定为附加字段：片库无站点类型列，按资源标题季集标记与关键词推断。
+        for candidate in collected:
+            candidate.update(infer_candidate_media_type(
+                candidate, query_media_type=query.media_type,
+            ))
         return collected
 
     def resolve_resource(

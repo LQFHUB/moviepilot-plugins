@@ -74,6 +74,14 @@ class HistoryRetryService(OwnerDelegator):
         if not can_retry:
             raise ValueError(retry_title)
 
+        # 历史重试同样按记录的媒体类型选择转存路径：优先电影/剧集专属路径，
+        # 未配置或类型判不出时回落到该网盘原有默认转存路径。
+        self._set_transfer_media_type(
+            MediaType.TV
+            if str(record.get("type") or "") == "电视剧"
+            else MediaType.MOVIE
+        )
+
         source_sha1 = str(record.get("source_sha1") or "").strip()
         source_name = str(
             record.get("source_file_name") or record.get("file_name") or ""

@@ -424,6 +424,13 @@
                   <v-icon icon="mdi-arrow-up" size="11" />
                   {{ res.seeders }}
                 </span>
+                <span
+                  v-if="mediaTypePill(res)"
+                  class="resource-media-type-badge flex-shrink-0"
+                  :class="`resource-media-type-badge--${mediaTypePill(res).kind}`"
+                  :title="mediaTypePill(res).title">
+                  {{ mediaTypePill(res).label }}
+                </span>
               </div>
 
               <!-- 操作按钮组 -->
@@ -793,6 +800,27 @@ function groupResourceMeta(res) {
 function messageLink(res) {
   if (!groupResourceMeta(res)) return "";
   return String(res?.provider_data?.message_url || res?.source_url || "").trim();
+}
+
+/** 返回资源行「电影/剧集」小标签；没有类型字段时不显示。 */
+function mediaTypePill(res) {
+  const value = String(res?.media_type || "").trim().toLowerCase();
+  if (!["movie", "tv", "unknown"].includes(value)) return null;
+  const sourceLabel =
+    {
+      hashtag: "话题标签",
+      channel: "站点类型",
+      season: "季集标记",
+      keyword: "关键词",
+      query: "搜索类型",
+    }[String(res?.media_type_source || "").trim().toLowerCase()] || "未记录";
+  if (value === "movie") {
+    return {label: "电影", kind: "movie", title: `类型判定：电影（来源：${sourceLabel}）`};
+  }
+  if (value === "tv") {
+    return {label: "剧集", kind: "tv", title: `类型判定：剧集（来源：${sourceLabel}）`};
+  }
+  return {label: "未知", kind: "unknown", title: `类型判定：未能判定（来源：${sourceLabel}）`};
 }
 
 /** 把 ISO8601 发布时间格式化为「YYYY-MM-DD HH:mm」，解析失败时返回原值。 */
@@ -2056,6 +2084,38 @@ const closeMediaDetail = () => {
   line-height: 1.2 !important;
 }
 
+/* 资源行媒体类型小标签：电影/剧集/未知（未知为灰色） */
+.resource-media-type-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  border: 1px solid transparent !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+  line-height: 1.2 !important;
+}
+
+.resource-media-type-badge--movie {
+  color: #0ea5e9 !important;
+  background: rgba(14, 165, 233, 0.12) !important;
+  border-color: rgba(14, 165, 233, 0.32) !important;
+}
+
+.resource-media-type-badge--tv {
+  color: #8b5cf6 !important;
+  background: rgba(139, 92, 246, 0.12) !important;
+  border-color: rgba(139, 92, 246, 0.32) !important;
+}
+
+.resource-media-type-badge--unknown {
+  color: rgba(var(--v-theme-on-surface), 0.55) !important;
+  background: rgba(var(--v-theme-on-surface), 0.08) !important;
+  border-color: rgba(var(--v-theme-on-surface), 0.18) !important;
+}
+
 .tag-size {
   color: rgb(var(--v-theme-primary)) !important;
   border-color: rgba(var(--v-theme-primary), 0.38) !important;
@@ -2808,6 +2868,10 @@ const closeMediaDetail = () => {
 
   .resource-seeders-badge {
     font-size: 0.68rem !important;
+  }
+
+  .resource-media-type-badge {
+    font-size: 0.64rem !important;
   }
 
   .quality-tag-pill {

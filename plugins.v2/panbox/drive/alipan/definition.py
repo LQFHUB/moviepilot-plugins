@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Optional
 
 from .client import AliPanClient
 from .provider import AliPanDrive, create_alipan_provider
-from ...core.definitions import DriverDefinition, FieldSpec, GroupSpec
+from ...core.definitions import (
+    DriverDefinition, FieldSpec, GroupSpec,
+    media_type_transfer_fields,
+)
 
 
 class AliPanDriverDefinition(DriverDefinition):
@@ -62,6 +65,9 @@ class AliPanDriverDefinition(DriverDefinition):
                         drive_provider="alipan",
                         hint="分享转存和跨盘上传先保存到此路径。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "alipan_transfer_path", "alipan",
                     ),
                     FieldSpec(
                         key="alipan_media_path",

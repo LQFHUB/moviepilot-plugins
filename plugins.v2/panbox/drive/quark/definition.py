@@ -12,6 +12,7 @@ from ...core.definitions import (
     FieldSpec,
     GroupSpec,
     build_checkin_definition,
+    media_type_transfer_fields,
 )
 
 
@@ -84,6 +85,9 @@ class QuarkDriverDefinition(DriverDefinition):
                         drive_provider="quark",
                         hint="夸克分享先保存到此路径，之后按平台规则整理。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "quark_transfer_path", "quark",
                     ),
                     FieldSpec(
                         key="quark_media_path",

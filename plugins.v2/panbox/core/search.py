@@ -83,6 +83,12 @@ class SearchCandidate(TypedDict, total=False):
     target_episodes: List[int]
     supports_file_preview: bool
     provider_data: Dict[str, Any]
+    #: 资源媒体类型三态：movie / tv / unknown；未接入推断的渠道不做强制赋值。
+    media_type: str
+    #: 类型判定来源：hashtag / channel / season / keyword / query / unknown。
+    media_type_source: str
+    #: 渠道站点自带的类型列原文（如 SeedHub 的「电影/剧集」），仅供类型推断消费。
+    site_media_type: str
     #: 来源分组信息：由渠道自行填充，前端据此按来源（如 TG 频道）分组展示。
     #: 非分组渠道留空，前端维持原有平铺展示。
     group_key: str
@@ -126,12 +132,41 @@ def normalize_search_candidate(
         dict(provider_data) if isinstance(provider_data, Mapping) else {}
     )
     result["identity_verified"] = bool(result.get("identity_verified"))
+    site_media_type = str(result.get("site_media_type") or "").strip()
+    if site_media_type:
+        result["site_media_type"] = site_media_type
+    else:
+        result.pop("site_media_type", None)
+    if "media_type" in result:
+        result["media_type"] = str(result.get("media_type") or "").strip().lower()
+        result["media_type_source"] = str(
+            result.get("media_type_source") or ""
+        ).strip().lower()
     try:
         target_season = int(result.get("target_season") or 0)
     except (TypeError, ValueError):
         target_season = 0
     result["target_season"] = target_season if target_season > 0 else None
     return result
+
+
+def fill_candidate_media_type(
+        candidate: Dict[str, Any], query_media_type: Any = None
+) -> None:
+    """为尚未判定媒体类型的候选补齐类型字段。
+
+    渠道已给出的 movie / tv 判定优先保留；只有当渠道没给（或只给了 unknown）时，
+    才按「话题标签 → 站点类型 → 季集标记 → 关键词 → 搜索意图」重新推断，
+    因此对手工未接入的类型判断是纯附加行为，不改变既有筛选与排序。
+    """
+    from ..search.matching import infer_candidate_media_type
+
+    current = str(candidate.get("media_type") or "").strip().lower()
+    if current in {"movie", "tv"}:
+        return
+    candidate.update(
+        infer_candidate_media_type(candidate, query_media_type=query_media_type)
+    )
 
 
 @dataclass(frozen=True)
@@ -308,19 +343,28 @@ class SearchProvider:
 
     def search(self, query: SearchQuery) -> List[SearchCandidate]:
         rows = self.require(SearchCapability.RESOURCE_SEARCH).search(query)
-        return [
+        candidates = [
             normalize_search_candidate(row, self.key)
             for row in (rows or [])
             if isinstance(row, Mapping)
         ]
+        for candidate in candidates:
+            fill_candidate_media_type(
+                candidate, getattr(query, "media_type", None)
+            )
+        return candidates
 
     def resolve(self, **kwargs: Any) -> SearchCandidate:
         row = self.require(SearchCapability.RESOURCE_RESOLVE).resolve(**kwargs)
-        return normalize_search_candidate(row or {}, self.key)
+        candidate = normalize_search_candidate(row or {}, self.key)
+        fill_candidate_media_type(candidate)
+        return candidate
 
     def preview(self, candidate: Mapping[str, Any]) -> SearchCandidate:
         row = self.require(SearchCapability.RESOURCE_PREVIEW).preview(candidate)
-        return normalize_search_candidate(row or {}, self.key)
+        result = normalize_search_candidate(row or {}, self.key)
+        fill_candidate_media_type(result)
+        return result
 
     def unlock(
             self, candidate: Mapping[str, Any], search_label: str = ""

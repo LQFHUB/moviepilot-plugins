@@ -6,7 +6,13 @@ from app.schemas.types import MediaType
 
 from .client import PirateBayClient, PirateBayError
 from ..magnet import clear_cache, media_titles, normalize_magnets
-from ..matching import extract_season, extract_year, resource_title_matches, unique_texts
+from ..matching import (
+    extract_season,
+    extract_year,
+    infer_candidate_media_type,
+    resource_title_matches,
+    unique_texts,
+)
 from ...core.search import SearchQuery
 
 
@@ -94,7 +100,13 @@ class PirateBaySearchService:
             if len(collected) >= limit:
                 break
 
-        return normalize_magnets(collected, "piratebay")
+        resources = normalize_magnets(collected, "piratebay")
+        # 类型判定为附加字段：海盗湾无站点类型列，按标题季集标记与关键词推断。
+        for resource in resources:
+            resource.update(infer_candidate_media_type(
+                resource, query_media_type=query.media_type,
+            ))
+        return resources
 
     def clear_cache(self) -> int:
         return clear_cache(self._client)

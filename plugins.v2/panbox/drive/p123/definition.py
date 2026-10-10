@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Optional
 
 from .client import P123ClientManager
 from .provider import P123Drive, create_p123_provider
-from ...core.definitions import DriverDefinition, FieldSpec, GroupSpec
+from ...core.definitions import (
+    DriverDefinition, FieldSpec, GroupSpec,
+    media_type_transfer_fields,
+)
 
 
 class P123DriverDefinition(DriverDefinition):
@@ -52,6 +55,9 @@ class P123DriverDefinition(DriverDefinition):
                         drive_provider="123",
                         hint="123分享和离线任务先保存到此路径，之后按平台规则整理。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "p123_transfer_path", "123",
                     ),
                     FieldSpec(
                         key="p123_media_path",

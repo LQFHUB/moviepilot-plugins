@@ -2,7 +2,7 @@
 
 import html
 import re
-from typing import Any, Callable, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import unicodedata
 
@@ -20,10 +20,103 @@ _SEASON_PATTERNS = (
     _ROMAN_SEASON_PATTERN,
     re.compile(r"第\s*([零〇一二两三四五六七八九十百\d]{1,6})\s*季"),
 )
+#: 合并季集写法（如 ``S02E03``）：``_SEASON_PATTERNS`` 第一项因 ``\b`` 边界无法命中，
+#: 需要单独识别，否则「电影拒收带季号候选」的规则会静默失效。
+_SEASON_EPISODE_PATTERN = re.compile(
+    r"(?i)\bS(?:eason)?[ ._-]*0*(\d{1,3})[ ._-]*E\d{1,4}\b"
+)
 _ROMAN_NUMBERS = {
     "I": 1, "II": 2, "III": 3, "IV": 4, "V": 5,
     "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10,
 }
+
+#: 统一媒体类型三态取值；禁止把判不出的结果默认成电影。
+MEDIA_TYPE_MOVIE = "movie"
+MEDIA_TYPE_TV = "tv"
+MEDIA_TYPE_UNKNOWN = "unknown"
+
+#: 话题标签中的媒体类型词（中日韩词按「包含」判定）；电影类词在前，命中即返回。
+_MEDIA_TAG_WORD_TYPES = (
+    ("电影", MEDIA_TYPE_MOVIE),
+    ("影片", MEDIA_TYPE_MOVIE),
+    ("剧场版", MEDIA_TYPE_MOVIE),
+    ("院线", MEDIA_TYPE_MOVIE),
+    ("电视剧", MEDIA_TYPE_TV),
+    ("剧集", MEDIA_TYPE_TV),
+    ("连续剧", MEDIA_TYPE_TV),
+    ("国产剧", MEDIA_TYPE_TV),
+    ("美剧", MEDIA_TYPE_TV),
+    ("韩剧", MEDIA_TYPE_TV),
+    ("日剧", MEDIA_TYPE_TV),
+    ("泰剧", MEDIA_TYPE_TV),
+    ("港剧", MEDIA_TYPE_TV),
+    ("台剧", MEDIA_TYPE_TV),
+    ("动漫", MEDIA_TYPE_TV),
+    ("动画", MEDIA_TYPE_TV),
+    ("番剧", MEDIA_TYPE_TV),
+    ("综艺", MEDIA_TYPE_TV),
+    ("短剧", MEDIA_TYPE_TV),
+)
+#: ASCII 标签词必须整词相等，避免「tvb」这类词误命中。
+_MEDIA_ASCII_TAG_TYPES = {
+    "movie": MEDIA_TYPE_MOVIE,
+    "movies": MEDIA_TYPE_MOVIE,
+    "film": MEDIA_TYPE_MOVIE,
+    "tv": MEDIA_TYPE_TV,
+    "series": MEDIA_TYPE_TV,
+    "tvseries": MEDIA_TYPE_TV,
+    "tv series": MEDIA_TYPE_TV,
+    "tv-series": MEDIA_TYPE_TV,
+}
+#: 站点结构化类型字段的取值映射（中英文），用于「channel」来源判定。
+_MEDIA_CHANNEL_TYPE_MAP = {
+    "movie": MEDIA_TYPE_MOVIE,
+    "movies": MEDIA_TYPE_MOVIE,
+    "film": MEDIA_TYPE_MOVIE,
+    "电影": MEDIA_TYPE_MOVIE,
+    "影片": MEDIA_TYPE_MOVIE,
+    "院线": MEDIA_TYPE_MOVIE,
+    "tv": MEDIA_TYPE_TV,
+    "series": MEDIA_TYPE_TV,
+    "tv series": MEDIA_TYPE_TV,
+    "电视剧": MEDIA_TYPE_TV,
+    "剧集": MEDIA_TYPE_TV,
+    "连续剧": MEDIA_TYPE_TV,
+    "动漫": MEDIA_TYPE_TV,
+    "动画": MEDIA_TYPE_TV,
+    "番剧": MEDIA_TYPE_TV,
+    "综艺": MEDIA_TYPE_TV,
+    "短剧": MEDIA_TYPE_TV,
+}
+#: 季集/集数标记：命中即判定为剧集。
+_MEDIA_SEASON_EPISODE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bS\d{1,3}\s*E\d{1,4}\b"
+    r"|\bS\d{1,3}\b"
+    r"|\bSeason[ ._-]*\d{1,3}\b"
+    r"|第\s*\d{1,3}\s*季"
+    r"|\bE\d{1,4}\b"
+    r"|\bEP\d{1,4}\b"
+    r"|第\s*\d{1,4}\s*[集话期]"
+    r"|更新至\s*\d{1,4}\s*[集话]"
+    r"|全\s*\d{1,4}\s*[集话期]"
+    r"|\b\d{1,4}\s*集\b"
+    r")"
+)
+#: 剧集类关键词（季集标记之外仍可判定为剧集的词）。
+_MEDIA_TV_KEYWORD_RE = re.compile(
+    r"(?:连载|番剧|综艺|动漫|短剧|合集|完结|全集"
+    r"|第\s*[0-9一二三四五六七八九十百]{1,4}\s*[季期])"
+)
+#: 电影类关键词：显式电影词，或「年份 + 发行规格」且全篇无季集标记的发布名。
+_MEDIA_MOVIE_KEYWORD_RE = re.compile(
+    r"(?:剧场版|电影|影片|院线|\bmovie\b"
+    r"|(?:19|20)\d{2}[^\d\r\n]{0,12}"
+    r"(?:4K|2160P|1080P|720P|REMUX|BLU-?RAY|WEB-?DL|WEB-?RIP|HDTV))",
+    re.IGNORECASE,
+)
+#: 标题内联话题标签（如「某某 #电视剧」）。
+_MEDIA_INLINE_HASHTAG_RE = re.compile(r"#([^\s#，,。;；|/]+)")
 
 _TAG_LANGUAGE_INNER_RE = re.compile(
     r"内封(?:简繁英|简繁中英|简繁|简中|繁中|中文|英语|英文)", re.IGNORECASE
@@ -125,8 +218,11 @@ def _chinese_number(value: str) -> Optional[int]:
 
 
 def extract_season(value: object) -> Optional[int]:
-    """从中英文发布标题提取季号。"""
+    """从中英文发布标题提取季号（含 ``S02E03`` 这类合并季集写法）。"""
     text = unicodedata.normalize("NFKC", html.unescape(str(value or "")))
+    merged = _SEASON_EPISODE_PATTERN.search(text)
+    if merged:
+        return int(merged.group(1))
     for index, pattern in enumerate(_SEASON_PATTERNS):
         matched = pattern.search(text)
         if not matched:
@@ -137,6 +233,118 @@ def extract_season(value: object) -> Optional[int]:
             return _ROMAN_NUMBERS.get(matched.group(1).upper())
         return _chinese_number(matched.group(1))
     return None
+
+
+def normalize_media_type(value: Any) -> str:
+    """把 ``MediaType`` 枚举、中英文类型文本规范为 movie / tv / unknown。"""
+    if value is None:
+        return MEDIA_TYPE_UNKNOWN
+    raw = getattr(value, "value", value)
+    text = str(raw or "").strip().casefold()
+    if text in {MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV}:
+        return text
+    mapped = _MEDIA_CHANNEL_TYPE_MAP.get(text)
+    if mapped:
+        return mapped
+    name = str(getattr(value, "name", "") or "").strip().casefold()
+    if name in {MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV}:
+        return name
+    return _MEDIA_CHANNEL_TYPE_MAP.get(name, MEDIA_TYPE_UNKNOWN)
+
+
+def _tag_media_type(tag: object) -> str:
+    """把单个话题标签映射为媒体类型；识别不出时返回空串。"""
+    text = str(tag or "").strip().lstrip("#").strip().casefold()
+    if not text:
+        return ""
+    if text in _MEDIA_ASCII_TAG_TYPES:
+        return _MEDIA_ASCII_TAG_TYPES[text]
+    for word, media_type in _MEDIA_TAG_WORD_TYPES:
+        if word in text:
+            return media_type
+    return ""
+
+
+def infer_media_type(
+        title: object = "",
+        *,
+        tags: Optional[Iterable[object]] = None,
+        channel_media_type: object = None,
+        query_media_type: object = None,
+) -> Tuple[str, str]:
+    """按可靠性顺序推断资源候选的媒体类型，并返回判定来源。
+
+    判定顺序（命中即返回）：
+
+    1. 话题标签：``#电影`` / ``#电视剧`` 等原始标签，来源 ``hashtag``；
+    2. 站点结构化类型：搜索结果 meta 中的类型列，来源 ``channel``；
+    3. 季集/集数标记：``S02E03`` / ``第12集`` / ``更新至12集`` 等，来源 ``season``；
+    4. 关键词：``全24集`` / ``完结`` / ``剧场版`` / ``合集`` 等，来源 ``keyword``；
+    5. 搜索意图：仅在前四步均无线索时采用调用方查询类型，来源 ``query``；
+    6. 仍无法判定时返回 ``unknown``。
+
+    :param title: 资源发布标题
+    :param tags: 原始话题标签（应传未被显示层过滤的原始标签）
+    :param channel_media_type: 站点结构化类型（如 SeedHub 搜索 meta 的类型列）
+    :param query_media_type: 调用方搜索意图类型，优先级最低
+    :return: ``(media_type, source)``，``source`` 取值 hashtag / channel / season / keyword / query / unknown
+    """
+    raw_title = str(title or "")
+    hashtags = list(tags or ()) + _MEDIA_INLINE_HASHTAG_RE.findall(raw_title)
+    for tag in hashtags:
+        media_type = _tag_media_type(tag)
+        if media_type:
+            return media_type, "hashtag"
+
+    channel_type = normalize_media_type(channel_media_type)
+    if channel_type != MEDIA_TYPE_UNKNOWN:
+        return channel_type, "channel"
+
+    if _MEDIA_SEASON_EPISODE_RE.search(raw_title):
+        return MEDIA_TYPE_TV, "season"
+
+    if _MEDIA_TV_KEYWORD_RE.search(raw_title):
+        return MEDIA_TYPE_TV, "keyword"
+    if _MEDIA_MOVIE_KEYWORD_RE.search(raw_title):
+        return MEDIA_TYPE_MOVIE, "keyword"
+
+    query_type = normalize_media_type(query_media_type)
+    if query_type != MEDIA_TYPE_UNKNOWN:
+        return query_type, "query"
+    return MEDIA_TYPE_UNKNOWN, "unknown"
+
+
+def infer_candidate_media_type(
+        candidate: Any = None,
+        *,
+        channel_media_type: object = None,
+        query_media_type: object = None,
+) -> Dict[str, str]:
+    """基于候选自身的标题与标签推断媒体类型，返回可直接合并进候选的字段。
+
+    :param candidate: 候选字典（读取 ``title``、``tags``、``site_media_type``）
+    :param channel_media_type: 站点结构化类型，缺省时回落到候选的 ``site_media_type``
+    :param query_media_type: 调用方搜索意图类型，优先级最低
+    :return: ``{"media_type": ..., "media_type_source": ...}``
+    """
+    data = candidate if isinstance(candidate, Mapping) else {}
+    raw_tags = data.get("tags")
+    tags = (
+        list(raw_tags)
+        if isinstance(raw_tags, (list, tuple, set, frozenset))
+        else None
+    )
+    media_type, source = infer_media_type(
+        data.get("title"),
+        tags=tags,
+        channel_media_type=(
+            channel_media_type
+            if channel_media_type
+            else data.get("site_media_type")
+        ),
+        query_media_type=query_media_type,
+    )
+    return {"media_type": media_type, "media_type_source": source}
 
 
 def normalize_season(value: Any, default: int = 1) -> int:

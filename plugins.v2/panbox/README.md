@@ -101,3 +101,45 @@ group_key="tg_channel:<频道用户名>" / group_title / group_icon / group_subt
 - **网盘类型筛选**：`tg_channel` 标签页下隐藏网盘类型子 tab（胶囊按钮）且不做类型过滤
   （展示该频道全部候选）；其它渠道沿用原有子 tab 逻辑，行为不变。
 
+## 电影 / 剧集默认转存路径（v1.8.0）
+
+### 配置键
+
+在「网盘配置」每个已启用网盘分组内，紧随「网盘转存路径」之后新增两个可选目录：
+
+| 键 | 类型 | 默认值 | 说明 |
+|:---|:---|:---|:---|
+| `<驱动前缀>_transfer_path_movie` | cloud-directory | `""`（空） | 仅电影类型资源优先转存到此路径 |
+| `<驱动前缀>_transfer_path_tv` | cloud-directory | `""`（空） | 仅剧集类型资源优先转存到此路径 |
+
+- 键名前缀与既有 `<前缀>_transfer_path` 一致，逐网盘为 `p115_` / `quark_` / `tianyi_` /
+  `p123_` / `alipan_` / `yun139_` / `guangya_`。
+- 目录选择复用既有 `cloud-directory` 字段与目录选择弹窗，存的是**网盘路径**，不是目录 ID
+  （目录 ID 由转存时按路径解析）。
+- **回落规则**：留空 = 不启用该类型分流，转存时使用该网盘原有「网盘转存路径」；
+  类型判定为 `unknown` 时同样回落到默认转存路径，**不会因为判不出类型而不转存**。
+
+### 类型判定
+
+`search/matching.py` 的 `infer_media_type()` 按可靠性排序返回 `(media_type, source)`：
+
+```text
+话题标签(hashtag) → 站点结构化类型(channel) → 季集/集数标记(season)
+→ 关键词(keyword) → 搜索意图(query) → unknown
+```
+
+- 三态取值 `movie` / `tv` / `unknown`，**不存在「判不出就默认电影」的行为**。
+- 候选字段 `media_type` / `media_type_source` 由渠道在构造候选时写入；未逐渠道接入的
+  搜索源统一在 Provider 边界（`core/search.py: SearchProvider.search`）补齐，属纯附加字段，
+  不改变既有筛选与排序。
+- 转存前会在转存处按**资源自身标题**再推断一次（`SyncHandler.resolve_transfer_path`），
+  避免只依赖搜索期字段。
+
+## 变更记录
+
+| 版本 | 说明 |
+|:---|:---|
+| v1.8.0 | 新增影片/剧集默认转存路径配置，按资源类型自动转存到对应网盘路径；搜索结果新增电影/剧集类型标签；修复 `extract_season` 不识别 `SxxExx` 导致电影拒收带季号候选规则失效 |
+| v1.7.1 | 修复资源搜索弹窗频道分组折叠失效（`v-show` 被 `!important` 覆盖，改 `v-if`），整体放大弹窗尺寸 |
+| v1.7.0 | TG 搜索结果展示完整发布名、按频道分组默认折叠并支持频道排序，TG 标签页隐藏网盘类型筛选 |
+

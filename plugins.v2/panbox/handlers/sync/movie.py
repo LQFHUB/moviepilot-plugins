@@ -36,6 +36,8 @@ class MovieSyncProcessor(OwnerDelegator):
         :return: 更新后的转存数量
         """
         track_points = not manual_resources
+        # 电影任务按媒体类型切换转存目标路径（未配置电影路径时回落默认转存路径）。
+        self._set_transfer_media_type(MediaType.MOVIE)
         try:
             if self._stop_requested():
                 return transferred_count

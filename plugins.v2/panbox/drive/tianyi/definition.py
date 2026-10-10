@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Optional
 
 from .client import TianyiClient
 from .provider import TianyiDrive, create_tianyi_provider
-from ...core.definitions import DriverDefinition, FieldSpec, GroupSpec
+from ...core.definitions import (
+    DriverDefinition, FieldSpec, GroupSpec,
+    media_type_transfer_fields,
+)
 
 
 class TianyiDriverDefinition(DriverDefinition):
@@ -69,6 +72,9 @@ class TianyiDriverDefinition(DriverDefinition):
                         drive_provider="tianyi",
                         hint="天翼跨盘上传和整理任务先保存到此路径，之后按规则整理。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "tianyi_transfer_path", "tianyi",
                     ),
                     FieldSpec(
                         key="tianyi_media_path",

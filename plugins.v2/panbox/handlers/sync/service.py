@@ -74,6 +74,13 @@ from ...core.media import (
     tmdb_id_of,
 )
 from ...drive.scanner import get_driver_definitions
+from ...search.matching import (
+    MEDIA_TYPE_MOVIE,
+    MEDIA_TYPE_TV,
+    MEDIA_TYPE_UNKNOWN,
+    infer_media_type,
+    normalize_media_type,
+)
 from ...utils import StrmGenerator, StrmTemplateError
 from ...utils.cache import create_platform_ttl_cache
 
@@ -335,11 +342,31 @@ class SyncHandler:
         )
         self._local_resource_path = str(_get_val("local_resource_path", "") or "").strip()
 
+        #: 线程内转存路径覆盖：同一 SyncHandler 会被多个订阅线程共享，
+        #: 电影/剧集分流必须按线程隔离，避免并发订阅互相串路径。
+        self._transfer_local = threading.local()
+
         paths = cloud_transfer_paths if cloud_transfer_paths is not None else self._configured_transfer_paths(plugin)
         self._cloud_transfer_paths = {
             str(key).strip().lower(): self._normalize_cloud_path(value)
             for key, value in dict(paths or {}).items()
             if str(key).strip()
+        }
+
+        # 电影/剧集专属转存路径：未配置的网盘不进映射，转存时回落到默认转存路径。
+        self._cloud_transfer_paths_movie = {
+            str(key).strip().lower(): self._normalize_cloud_path(value)
+            for key, value in dict(
+                self._configured_media_type_transfer_paths(plugin, "movie") or {}
+            ).items()
+            if str(key).strip() and str(value or "").strip()
+        }
+        self._cloud_transfer_paths_tv = {
+            str(key).strip().lower(): self._normalize_cloud_path(value)
+            for key, value in dict(
+                self._configured_media_type_transfer_paths(plugin, "tv") or {}
+            ).items()
+            if str(key).strip() and str(value or "").strip()
         }
 
         media_paths = cloud_media_paths if cloud_media_paths is not None else self._configured_media_paths(plugin)
@@ -356,6 +383,7 @@ class SyncHandler:
                 or (self._cloud_transfer_paths.get(drive_key) if drive_key else None)
                 or "/"
         )
+        # 该赋值经由 _cloud_transfer_path 的 setter 写入默认转存路径。
         self._cloud_transfer_path = (
                 str(raw_transfer_path or "/").strip().rstrip("/") or "/"
         )
@@ -2547,11 +2575,122 @@ class SyncHandler:
             paths[definition_cls.id] = val
         return paths
 
-    def _cross_transfer_staging_path(self, provider_key: str) -> str:
-        base_path = self._cloud_transfer_paths.get(
-            str(provider_key or "").strip().lower(), "/"
+    @staticmethod
+    def _configured_media_type_transfer_paths(
+            plugin: Any, media_type: str
+    ) -> Dict[str, str]:
+        """按驱动自描述读取各网盘的电影/剧集专属转存路径。
+
+        只返回真正配置过的网盘（空串视为未启用分流），新增网盘无需改动此处。
+        """
+        paths: Dict[str, str] = {}
+        for definition_cls in get_driver_definitions():
+            key = (
+                definition_cls.get_transfer_movie_path_key()
+                if media_type == "movie"
+                else definition_cls.get_transfer_tv_path_key()
+            )
+            if not key:
+                continue
+            val = str(getattr(plugin, f"_{key}", "") or "").strip()
+            if val:
+                paths[definition_cls.id] = val
+        return paths
+
+    @property
+    def _cloud_transfer_path(self) -> str:
+        """当前任务的转存目标路径：按媒体类型分流，未配置时回落到网盘默认转存路径。"""
+        override = getattr(self._transfer_local, "path", "")
+        return str(override or self._default_transfer_path)
+
+    @_cloud_transfer_path.setter
+    def _cloud_transfer_path(self, value: Any) -> None:
+        """写入该网盘的默认转存路径（不做媒体类型分流）。"""
+        self._default_transfer_path = (
+                str(value or "/").strip().rstrip("/") or "/"
         )
-        # 直接复用已配置的转存目录，不为跨盘任务创建额外目录。
+
+    def resolve_transfer_path(
+            self,
+            media_type: Any = "",
+            resource_title: Any = "",
+            drive_key: str = "",
+    ) -> str:
+        """按媒体类型解析转存目标路径。
+
+        电影/剧集专属路径优先；未配置该类型路径或类型判定为 unknown 时，
+        一律回落到该网盘原有的默认转存路径（不会因判不出类型而不转存）。
+
+        :param media_type: 媒体类型（MediaType 枚举或 movie/tv/unknown 文本）
+        :param resource_title: 资源标题；传入时会以资源自身信息重算一次类型
+        :param drive_key: 指定网盘 key，缺省使用当前转存网盘
+        """
+        resolved = normalize_media_type(media_type)
+        if str(resource_title or "").strip():
+            inferred, _source = infer_media_type(resource_title)
+            if inferred != MEDIA_TYPE_UNKNOWN:
+                resolved = inferred
+        current_key = str(getattr(self._cloud_drive, "key", "") or "").strip().lower()
+        target_key = str(drive_key or "").strip().lower() or current_key
+        if resolved not in {MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV}:
+            return self._transfer_path_default_for(target_key)
+        if not target_key:
+            return self._transfer_path_default_for(target_key)
+        mapping = (
+            self._cloud_transfer_paths_movie
+            if resolved == MEDIA_TYPE_MOVIE
+            else self._cloud_transfer_paths_tv
+        )
+        return str(
+            mapping.get(target_key)
+            or self._transfer_path_default_for(target_key)
+        )
+
+    def _transfer_path_default_for(self, drive_key: str) -> str:
+        """返回指定网盘的默认转存路径；当前网盘回落到实例默认值。"""
+        key = str(drive_key or "").strip().lower()
+        current_key = str(getattr(self._cloud_drive, "key", "") or "").strip().lower()
+        if not key or key == current_key:
+            return self._default_transfer_path
+        return str(self._cloud_transfer_paths.get(key) or "/")
+
+    def _transfer_media_type(self) -> str:
+        """返回当前线程任务已解析的媒体类型；未设置时返回 unknown。"""
+        return str(
+            getattr(self._transfer_local, "media_type", "") or MEDIA_TYPE_UNKNOWN
+        )
+
+    def _set_transfer_media_type(self, media_type: Any) -> str:
+        """按当前任务的媒体类型切换线程内转存目标路径，并返回最终路径。"""
+        resolved = normalize_media_type(media_type)
+        self._transfer_local.media_type = resolved
+        path = self.resolve_transfer_path(resolved)
+        self._transfer_local.path = path
+        return path
+
+    def _clear_transfer_media_type(self) -> None:
+        """清除线程内的转存路径覆盖，恢复该网盘的默认转存路径。"""
+        for name in ("path", "media_type"):
+            try:
+                delattr(self._transfer_local, name)
+            except AttributeError:
+                pass
+
+    def _cross_transfer_staging_path(self, provider_key: str) -> str:
+        """跨盘临时目录：按当前任务媒体类型复用对应网盘已配置的转存目录。"""
+        key = str(provider_key or "").strip().lower()
+        current_key = str(getattr(self._cloud_drive, "key", "") or "").strip().lower()
+        if not key or key == current_key:
+            return str(PurePosixPath(self._cloud_transfer_path))
+        media_type = self._transfer_media_type()
+        mapping = (
+            self._cloud_transfer_paths_movie
+            if media_type == MEDIA_TYPE_MOVIE
+            else self._cloud_transfer_paths_tv
+            if media_type == MEDIA_TYPE_TV
+            else {}
+        )
+        base_path = mapping.get(key) or self._cloud_transfer_paths.get(key) or "/"
         return str(PurePosixPath(base_path))
 
     @classmethod

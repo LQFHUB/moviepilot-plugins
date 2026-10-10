@@ -12,6 +12,7 @@ from ...core.definitions import (
     FieldSpec,
     GroupSpec,
     build_checkin_definition,
+    media_type_transfer_fields,
 )
 
 
@@ -92,6 +93,9 @@ class P115DriverDefinition(DriverDefinition):
                         drive_provider="115",
                         hint="115 分享和离线任务先保存到此路径，跨盘临时目录也创建在此路径下。",
                         cols=6,
+                    ),
+                    *media_type_transfer_fields(
+                        "p115_transfer_path", "115",
                     ),
                     FieldSpec(
                         key="p115_media_path",

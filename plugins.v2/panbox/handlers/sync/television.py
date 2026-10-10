@@ -39,6 +39,8 @@ class TelevisionSyncProcessor(OwnerDelegator):
         :return: 更新后的转存数量
         """
         track_points = not manual_resources
+        # 剧集任务按媒体类型切换转存目标路径（未配置剧集路径时回落默认转存路径）。
+        self._set_transfer_media_type(MediaType.TV)
         try:
             if self._stop_requested():
                 return transferred_count
