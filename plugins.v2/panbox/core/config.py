@@ -19,6 +19,16 @@ from .media import tmdb_id_of
 
 DEFAULT_AUTO_SUBSCRIBE_USERNAME = "网盘助手"
 
+#: TG 频道搜索默认预置的公开频道（用户名，不含 @ 与 t.me/s/ 前缀）；
+#: 与 search/tg_channel/definition.py 声明的表单默认值共用同一份来源。
+DEFAULT_TG_CHANNELS = (
+    "QukanMovie",
+    "Lsp115",
+    "Quark_Movies",
+    "shareAliyun",
+    "Remux4KFilm",
+)
+
 
 class UIConfig:
     """提供 Vue 配置页所需的数据，不再保留旧 iframe/Vuetify 表单。"""
@@ -168,6 +178,8 @@ class UIConfig:
             "search_circuit_breaker_enabled": True,
             "search_circuit_breaker_threshold": 3,
             "search_circuit_breaker_cooldown": 60,
+            "tg_channel_search_enabled": True,
+            "tg_channels": list(DEFAULT_TG_CHANNELS),
             "subscribe_filter_mode": "exclude",
             "exclude_subscribes": [],
             "include_subscribes": [],
