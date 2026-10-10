@@ -66,8 +66,14 @@ class TelegramChannelSearchService:
     )
     #: 每个频道最多尝试的关键词数量，避免站内模糊搜索反复请求。
     _MAX_KEYWORDS_PER_CHANNEL = 2
-    _MAX_TITLE_LENGTH = 120
+    #: 发布名（完整资源名）长度上限：要容纳规格/音轨/字幕/体积等元数据。
+    _MAX_TITLE_LENGTH = 200
     _MAX_DESCRIPTION_LENGTH = 600
+    #: 「发布名头部块」最多向后收集的连续有效行数，避免把整段简介并入标题；
+    #: 纯表情/装饰行不计入该数量（TG 帖子常把 emoji 与文字拆成独立行）。
+    _MAX_HEADER_LINES = 4
+    #: 头部块向后扫描的硬上限，防止装饰行过多时无限循环。
+    _MAX_HEADER_SCAN = 10
     #: 正文话题标签（TG 频道常用 #剧情 #4K 之类标注），作为候选标签的来源之一。
     _HASHTAG_RE = re.compile(r"#([A-Za-z0-9\u3400-\u9fff_]{2,16})")
     #: 只识别「数字 + 紧邻单位」的体积描述：年份/集数/评分等纯数字一律不匹配。
@@ -104,6 +110,32 @@ class TelegramChannelSearchService:
         r"<>《》\"“”'‘’]+|[\s\u3000#*·•・.,，。;；:：!！?？\-_~～|｜¦/／\\＼"
         r"\[\]【】()（）<>《》\"“”'‘’]+$"
     )
+    #: 发布名头部块的终止行（元数据/栏目标签、小节标题）：关键词后必须紧跟冒号
+    #: 或行尾，避免把「类型转换」这类以关键词开头的行误判为标签。
+    _HEADER_STOP_RE = re.compile(
+        r"^(?:资源信息|资源详情|资源简介|内容简介|剧情简介|简介|描述|详情|评分|类型"
+        r"|地区|语言|主演|导演|编剧|发行时间|上映时间|首播|片长|集数|单集片长|大小"
+        r"|体积|容量|链接|标签|频道|群组|投稿人|投稿|搜索|机场|公费服|收录版本|状态"
+        r"|最新评论|版权|来自|更新时间|发布时间|资源名称|磁力|网盘|提取码|密码|别名"
+        r"|又名)(?=\s*[:：]|$)"
+    )
+    #: 纯栏目/分类行（「动漫」「更新」等，经装饰清洗后整行即一个分类词），
+    #: 作为最后的标题回落时必须排除。
+    _CATEGORY_ONLY_RE = re.compile(
+        r"^(?:动漫|动画|电影|电视剧|剧集|美剧|韩剧|日剧|国漫|综艺|纪录片|体育|音乐"
+        r"|短剧|合集|资源|分享|推荐|最新|更新|已更新|完结|连载)$"
+    )
+    #: 发布名首尾的装饰分隔符（**不含括号**）：与 ``_TITLE_EDGE_RE`` 的区别是
+    #: 保留成对括号，避免把「(2026)」这类发布名末尾的括号当成装饰吃掉。
+    _TITLE_EDGE_SAFE_RE = re.compile(
+        r"^[\s\u3000#*·•・.,，。;；:：!！?？\-_~～|｜¦/／\\＼<>\"“”'‘’]+"
+        r"|[\s\u3000#*·•・.,，。;；:：!！?？\-_~～|｜¦/／\\＼<>\"“”'‘’]+$"
+    )
+    #: 发布名开头的「独占栏目前缀」包裹块（【更新】【完结】（合集）等）。
+    _TITLE_LEAD_PREFIX_RE = re.compile(
+        r"^[【\[（(《「『]\s*(?:更新|已更新|完结|已完结|全集|合集|最新|推荐|首发"
+        r"|独家|热播|资源|分享|超前|连载)\s*[】\]）)》」』]"
+    )
     #: 季/集标记：标题主体缺少季集信息时，从相邻行补一个。
     _EPISODE_MARKER_RE = re.compile(
         r"(?i)(?:S\d{1,3}\s*E\d{1,4}|E\d{1,4}\b|第\s*\d{1,4}\s*[集话期]"
@@ -124,10 +156,15 @@ class TelegramChannelSearchService:
         self._channel_config = {
             item["id"]: item for item in self._channel_items
         }
+        #: 频道在配置中的顺序：作为候选的 ``group_order`` 下发给前端，
+        #: 保证结果里的分组顺序与「TG 频道列表」配置顺序一致。
+        self._channel_order = {
+            item["id"]: index for index, item in enumerate(self._channel_items)
+        }
         self._result_limit = max(1, int(result_limit or 20))
         self._timeout = max(5.0, min(float(timeout or 60.0), 120.0))
 
-    def _channel_meta(self, channel: str) -> Dict[str, str]:
+    def _channel_meta(self, channel: str) -> Dict[str, Any]:
         """汇总频道展示信息：配置的名称/图标优先，缺项用公开页自动获取补齐。"""
         entry = self._channel_config.get(channel) or {}
         info: Dict[str, Any] = {}
@@ -146,6 +183,7 @@ class TelegramChannelSearchService:
             "name": configured_name or channel,
             "icon": icon,
             "url": f"{TelegramChannelClient.BASE_URL}/{channel}",
+            "order": self._channel_order.get(channel, 0),
         }
 
     @staticmethod
@@ -277,13 +315,27 @@ class TelegramChannelSearchService:
 
     @classmethod
     def _clean_title_text(cls, value: Any) -> str:
-        """清洗标题片段：剔除表情/格式符、截断元数据段落、去首尾装饰符。"""
+        """清洗发布名文本：去装饰符、剥独占栏目前缀、截断内联元数据、去首尾分隔符。
+
+        与旧实现的区别：首尾只清理装饰分隔符与「（【更新】）」这类独占栏目前缀，
+        **保留成对括号**，避免把 ``功夫女足 (2026)`` 末尾的括号当成装饰吃掉。
+        """
         text = unicodedata.normalize("NFKC", str(value or ""))
         text = cls._TITLE_DECORATION_RE.sub(" ", text)
         text = cls._TITLE_NOISE_RE.split(text, 1)[0]
         text = cls._TITLE_TRAILING_NOISE_RE.split(text, 1)[0]
-        text = cls._TITLE_EDGE_RE.sub("", text)
-        return re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"\s+", " ", text).strip()
+        # 站内搜索结果页会把命中的关键词用高亮节点切开（如「（2026）」变成
+        # 「（」「2026」「）」三行），拼接后需把括号内侧多余的空格收回。
+        text = re.sub(r"([(\[【（《「『])\s+", r"\1", text)
+        text = re.sub(r"\s+([)）\]】》」』,，。;；:：!！?？])", r"\1", text)
+        text = cls._TITLE_EDGE_SAFE_RE.sub("", text)
+        previous = None
+        while previous != text:
+            previous = text
+            text = cls._TITLE_LEAD_PREFIX_RE.sub("", text, count=1).strip()
+            text = cls._TITLE_EDGE_SAFE_RE.sub("", text)
+        return text.strip()
 
     @staticmethod
     def _match_title_position(line: Any, titles: Optional[List[str]]) -> int:
@@ -311,18 +363,83 @@ class TelegramChannelSearchService:
         return -1
 
     @classmethod
+    def _line_is_stop(cls, text: Any) -> bool:
+        """判断装饰清洗后的一行是否为元数据标签行、栏目标签行或链接行。
+
+        这类行是「发布名头部块」的边界：出现即停止收集后续行，避免把
+        ``评分：`` / ``资源信息`` / ``• 体积：20GB`` 之类的元数据并进发布名。
+        """
+        stripped = str(text or "").strip()
+        if not stripped:
+            return False
+        if stripped[0] in "#@•·▪◦‣*":
+            return True
+        lowered = stripped.casefold()
+        if lowered.startswith(
+                ("http://", "https://", "magnet:", "ed2k://", "t.me/", "www.")
+        ):
+            return True
+        return bool(cls._HEADER_STOP_RE.match(stripped))
+
+    @classmethod
+    def _line_is_meaningful(cls, line: Any) -> bool:
+        """判断一行能否作为标题回落项：排除纯栏目行、标签行与装饰行。"""
+        text = unicodedata.normalize("NFKC", str(line or ""))
+        text = cls._TITLE_DECORATION_RE.sub(" ", text)
+        text = cls._TITLE_EDGE_RE.sub("", text).strip()
+        if len(text) < 2 or cls._CATEGORY_ONLY_RE.match(text):
+            return False
+        return not cls._line_is_stop(text)
+
+    @classmethod
+    def _header_block(cls, lines: List[str], index: int, position: int) -> str:
+        """从片名行起拼出「完整发布名」块。
+
+        规则：以片名起始位置所在行的剩余内容为起点，向后收集连续行；
+        纯表情/装饰行跳过但不终止（TG 帖子常把 emoji 与文字拆成独立行），
+        遇到元数据标签行或链接行即停止。返回未做长度裁剪的拼接文本。
+        """
+        parts = [lines[index][max(position, 0):]]
+        collected = 0
+        for line in lines[index + 1:index + 1 + cls._MAX_HEADER_SCAN]:
+            stripped = cls._TITLE_DECORATION_RE.sub(
+                " ", unicodedata.normalize("NFKC", str(line or ""))
+            ).strip()
+            if not stripped:
+                continue
+            if cls._line_is_stop(stripped):
+                break
+            parts.append(line)
+            collected += 1
+            if collected >= cls._MAX_HEADER_LINES:
+                break
+        return " ".join(part for part in parts if str(part or "").strip())
+
+    @classmethod
     def _append_episode_marker(
             cls, body: str, lines: List[str], index: int
     ) -> str:
-        """标题主体没有季/集信息时，从紧随其后的两行补一个集数标记。"""
+        """发布名里没有季/集信息时，从紧随其后的若干行补一个集数标记。
+
+        只扫描发布名头部块同一段（遇到元数据标签行或链接行即停），避免把
+        分享链接里的 ``…e8`` 之类片段误当集数；集数若已包含在发布名里则原样
+        返回，不重复追加。
+        """
         if cls._EPISODE_MARKER_RE.search(body):
             return body[:cls._MAX_TITLE_LENGTH]
-        for line in lines[index + 1:index + 3]:
-            matched = cls._EPISODE_MARKER_RE.search(line)
+        for line in lines[index + 1:index + 6]:
+            stripped = cls._TITLE_DECORATION_RE.sub(
+                " ", unicodedata.normalize("NFKC", str(line or ""))
+            ).strip()
+            if not stripped:
+                continue
+            if cls._line_is_stop(stripped):
+                break
+            matched = cls._EPISODE_MARKER_RE.search(stripped)
             if not matched:
                 continue
             marker = cls._TITLE_EDGE_RE.sub("", matched.group(0)).strip()
-            if marker:
+            if marker and marker not in body:
                 return f"{body} {marker}"[:cls._MAX_TITLE_LENGTH]
         return body[:cls._MAX_TITLE_LENGTH]
 
@@ -333,16 +450,22 @@ class TelegramChannelSearchService:
             titles: Optional[List[str]] = None,
             expected_season: Optional[int] = None,
     ) -> str:
-        """优先取正文中与目标媒体匹配的片名，避免把栏目名/前缀当成标题。
+        """取正文中与目标媒体匹配的「完整发布名」，而不是只留片名。
 
-        匹配顺序：
+        取值顺序：
 
         1. 逐行定位命中 ``titles``（含多语言别名）的片名行，取该行片名之后的
-           内容为主体（丢弃「动漫｜」「4K电影」等栏目前缀），必要时补季/集标记；
-           多行命中时优先季号与目标一致的；
-        2. 整段正文中定位片名（片名可能跨行断开），取该位置所在行；
-        3. 均未命中时保守回落为正文中最长的有效行——宁可给较长的原始片段，
-           也不要把「动漫｜」这类栏目名当作标题。
+           内容并向后拼接「发布名头部块」（跳过纯装饰行，遇 ``评分：`` /
+           ``资源信息`` / ``• 体积：`` 等标签行或链接行即止），保留规格、编码、
+           音轨、字幕、体积等信息，例如
+           ``功夫女足 (2026) 4K SDR + DV 杜比视界``；多行命中时优先季号与
+           目标一致的；片名前的「动漫｜」「已更新：」等前缀被自然丢弃；
+        2. 头部块为空时，回落到命中媒体名的最长行；
+        3. 再回落到整段正文中匹配片名所在的那一行；
+        4. 均未命中时取正文中最长的有效行——排除「动漫」「更新」这类纯栏目行，
+           宁可给较长的原始片段，也不要把栏目名当作标题。
+
+        发布名中若已带集数则保留，不重复追加。
         """
         raw = str(text or "")
         lines = [
@@ -364,7 +487,15 @@ class TelegramChannelSearchService:
                         chosen = span
                         break
             index, position = chosen
-            body = cls._clean_title_text(lines[index][position:])
+            body = cls._clean_title_text(cls._header_block(lines, index, position))
+            if body:
+                return cls._append_episode_marker(body, lines, index)
+
+        if spans:
+            # 回落一：命中媒体名的最长行（片名与规格被拆到多行时信息最全的那行）。
+            index = max((span[0] for span in spans), key=lambda item: len(lines[item]))
+            position = max(cls._match_title_position(lines[index], titles), 0)
+            body = cls._clean_title_text(cls._header_block(lines, index, position))
             if body:
                 return cls._append_episode_marker(body, lines, index)
 
@@ -375,8 +506,10 @@ class TelegramChannelSearchService:
             if body:
                 return body[:cls._MAX_TITLE_LENGTH]
 
-        if lines:
-            body = cls._clean_title_text(max(lines, key=len))
+        # 回落二：最长有效行（排除纯栏目行、标签行与装饰行）。
+        valid_lines = [line for line in lines if cls._line_is_meaningful(line)]
+        if valid_lines:
+            body = cls._clean_title_text(max(valid_lines, key=len))
             if body:
                 return body[:cls._MAX_TITLE_LENGTH]
 
@@ -486,7 +619,7 @@ class TelegramChannelSearchService:
             expected_year: str,
             expected_season: Optional[int],
             limit: int,
-            channel_meta: Optional[Dict[str, str]] = None,
+            channel_meta: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """把命中媒体的消息转换为统一候选（一条消息可产出多条链接候选）。
 
@@ -541,6 +674,8 @@ class TelegramChannelSearchService:
                     "group_key": f"tg_channel:{message_channel}",
                     "group_title": channel_name,
                     "group_icon": channel_icon,
+                    # 分组顺序：频道在配置里的下标，前端据此排序（越小越靠前）。
+                    "group_order": int(meta.get("order") or 0),
                     "group_subtitle": (
                         f"@{message_channel}" if message_channel else ""
                     ),

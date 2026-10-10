@@ -207,7 +207,7 @@ curl -s https://raw.githubusercontent.com/LQFHUB/moviepilot-plugins/main/package
 
 | 插件 ID | 目录 | 名称 | 版本 | UI 模式 | 状态 | 用途与边界 |
 |:---|:---|:---|:---|:---|:---|:---|
-| `PanBox` | `plugins.v2/panbox` | 网盘助手 | 1.6.6 | vue 联邦 | 改造中 | 网盘订阅派生版：网盘订阅、多网盘转存、多渠道资源搜索、签到、历史；V2 布局在 V3 宿主上走向后兼容加载；前端产物已构建并提交 |
+| `PanBox` | `plugins.v2/panbox` | 网盘助手 | 1.7.0 | vue 联邦 | 改造中 | 网盘订阅派生版：网盘订阅、多网盘转存、多渠道资源搜索、签到、历史；V2 布局在 V3 宿主上走向后兼容加载；前端产物已构建并提交 |
 
 `PanBox` 详情（完整信息见 `plugins.v2/panbox/README.md`）：
 

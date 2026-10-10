@@ -1007,6 +1007,8 @@ class SearchApi(OwnerDelegator):
                 "group_title": str(item.get("group_title") or "").strip(),
                 "group_icon": str(item.get("group_icon") or "").strip(),
                 "group_subtitle": str(item.get("group_subtitle") or "").strip(),
+                # 分组顺序（频道在 TG 频道列表配置里的下标）：前端据此排序分组。
+                "group_order": int(item.get("group_order") or 0),
                 "source_url": source_url,
                 "url": str(
                     item.get("url") or item.get("share_url")

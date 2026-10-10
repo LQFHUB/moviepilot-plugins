@@ -70,6 +70,11 @@ export function useMediaDetail({api, pluginId, pluginConfig, showMessage}) {
     const list = currentChannelResources.value;
     const channel = String(activeChannelTab.value || "").toLowerCase();
     const isAnimeBtChannel = channel === "mikan" || channel === "animegarden";
+    // TG 频道按频道分组展示，不提供网盘类型子 tab：返回空表示「不做类型过滤、
+    // 展示全部候选」，其它渠道逻辑完全不变。
+    const isTgChannel = channel === "tg_channel";
+
+    if (isTgChannel) return [];
 
     if (isAnimeBtChannel) {
       if (!list.length) return [];

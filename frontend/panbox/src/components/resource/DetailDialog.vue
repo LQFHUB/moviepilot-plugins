@@ -301,8 +301,10 @@
               </v-card>
             </v-menu>
 
-            <!-- 子 tab 胶囊按钮列表 -->
-            <div class="category-pill-track d-flex align-center ga-1.5 flex-wrap">
+            <!-- 子 tab 胶囊按钮列表：TG 频道按频道分组展示，不显示网盘类型筛选 -->
+            <div
+              v-if="!isTgChannelTab"
+              class="category-pill-track d-flex align-center ga-1.5 flex-wrap">
               <button
                 v-for="tab in currentChannelResourceTabs"
                 :key="tab.value"
@@ -381,8 +383,23 @@
 
         <div v-else class="resource-list d-flex flex-column ga-1.5">
           <template v-for="(group, groupIndex) in groupedResources" :key="group.key || `flat-${groupIndex}`">
-            <!-- 来源分组头：仅当候选携带分组信息（如 TG 频道）时渲染，其它渠道保持平铺 -->
-            <div v-if="group.key" class="resource-group-header">
+            <!-- 来源分组头：仅当候选携带分组信息（如 TG 频道）时渲染，其它渠道保持平铺；
+                 点击整行可展开/折叠该分组的资源列表 -->
+            <div
+              v-if="group.key"
+              class="resource-group-header"
+              :class="{ 'resource-group-header--collapsed': !isGroupExpanded(group.key) }"
+              role="button"
+              tabindex="0"
+              :aria-expanded="isGroupExpanded(group.key) ? 'true' : 'false'"
+              :title="isGroupExpanded(group.key) ? '收起该频道资源' : '展开该频道资源'"
+              @click="toggleGroup(group.key)"
+              @keydown.enter.prevent="toggleGroup(group.key)"
+              @keydown.space.prevent="toggleGroup(group.key)">
+              <v-icon
+                :icon="isGroupExpanded(group.key) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                size="14"
+                class="resource-group-toggle" />
               <v-avatar size="22" rounded="lg" color="surface-variant" class="resource-group-avatar">
                 <v-img v-if="group.icon" :src="group.icon" cover />
                 <v-icon v-else icon="mdi-telegram" size="14" />
@@ -391,7 +408,11 @@
               <span v-if="group.subtitle" class="resource-group-subtitle">{{ group.subtitle }}</span>
               <span class="resource-group-count">{{ group.items.length }}</span>
             </div>
-            <div v-for="({res, idx}) in group.items" :key="resKey(res, idx)" class="resource-row-item">
+            <div
+              v-for="({res, idx}) in group.items"
+              v-show="isGroupExpanded(group.key)"
+              :key="resKey(res, idx)"
+              class="resource-row-item">
             <div class="resource-row-header d-flex align-center justify-space-between ga-2">
               <div class="resource-title-box min-w-0 flex-grow-1 d-flex align-center ga-1.5">
                 <span class="resource-title-text min-w-0 flex-grow-1" :title="res.title">
@@ -672,8 +693,9 @@ const isPointUnlockResource = (res) => defaultIsPointUnlockResource(res);
 const displayedResources = computed(() => props.currentChannelFilteredResources || []);
 
 /**
- * 按来源分组展示候选：候选携带 group_key 时按频道聚合（首个出现顺序），
- * 否则保持原有平铺顺序，确保其它搜索渠道的展示行为完全不变。
+ * 按来源分组展示候选：候选携带 group_key 时按频道聚合，分组顺序优先按后端下发的
+ * `group_order`（频道在 TG 频道列表配置里的下标），缺失时回落首个出现顺序；
+ * 不带 group_key 的渠道保持原有平铺顺序，确保其它搜索渠道的展示行为完全不变。
  */
 const groupedResources = computed(() => {
   const groups = [];
@@ -681,16 +703,18 @@ const groupedResources = computed(() => {
   (displayedResources.value || []).forEach((res, idx) => {
     const key = String(res?.group_key || "").trim();
     if (!key) {
-      groups.push({key: "", title: "", icon: "", subtitle: "", items: [{res, idx}]});
+      groups.push({key: "", title: "", icon: "", subtitle: "", order: null, items: [{res, idx}]});
       return;
     }
     let group = indexByKey.get(key);
     if (!group) {
+      const rawOrder = Number(res.group_order);
       group = {
         key,
         title: String(res.group_title || "").trim() || key,
         icon: String(res.group_icon || "").trim(),
         subtitle: String(res.group_subtitle || "").trim(),
+        order: Number.isFinite(rawOrder) ? rawOrder : null,
         items: [],
       };
       indexByKey.set(key, group);
@@ -698,8 +722,55 @@ const groupedResources = computed(() => {
     }
     group.items.push({res, idx});
   });
+  // 任一分组带有序号时才重排，排序稳定；其它渠道（无分组）完全不受影响。
+  if (groups.some((group) => group.key && group.order !== null)) {
+    return groups
+      .map((group, index) => ({group, index}))
+      .sort((a, b) => {
+        const left = a.group.order === null ? Number.MAX_SAFE_INTEGER : a.group.order;
+        const right = b.group.order === null ? Number.MAX_SAFE_INTEGER : b.group.order;
+        return left - right || a.index - b.index;
+      })
+      .map(({group}) => group);
+  }
   return groups;
 });
+
+/** 当前激活渠道是否为 TG 频道：该渠道按频道分组展示，不提供网盘类型子 tab。 */
+const isTgChannelTab = computed(
+  () => String(props.activeChannelTab || "").toLowerCase() === "tg_channel"
+);
+
+//: 已展开的来源分组（默认只展开第一个有资源的分组，其余折叠）。
+const expandedGroupKeys = ref(new Set());
+watch(
+  () => groupedResources.value.filter((group) => group.key).map((group) => group.key).join("|"),
+  () => {
+    const groupKeys = groupedResources.value
+      .filter((group) => group.key && group.items.length)
+      .map((group) => group.key);
+    const validKeys = new Set(groupKeys);
+    const next = new Set([...expandedGroupKeys.value].filter((key) => validKeys.has(key)));
+    if (![...next].some((key) => validKeys.has(key)) && groupKeys.length) {
+      next.add(groupKeys[0]);
+    }
+    expandedGroupKeys.value = next;
+  },
+  {immediate: true}
+);
+
+/** 切换某个来源分组的展开/折叠状态（点击分组头触发）。 */
+function toggleGroup(key) {
+  const next = new Set(expandedGroupKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedGroupKeys.value = next;
+}
+
+/** 判断某个来源分组当前是否展开（无分组信息的平铺渠道恒为展开）。 */
+function isGroupExpanded(key) {
+  return !key || expandedGroupKeys.value.has(key);
+}
 
 /** 返回候选的来源分组信息，缺失时返回 null（用于按需展示频道专属明细）。 */
 function groupResourceMeta(res) {
@@ -731,7 +802,10 @@ function formatResourceTime(value) {
 
 const currentSubTabLabel = computed(() => {
   const found = (props.currentChannelResourceTabs || []).find((t) => t.value === props.activeResourceTab);
-  return found ? found.title : (props.currentChannelResourceTabs?.[0]?.title || props.activeResourceTab || "资源列表");
+  if (found) return found.title;
+  // TG 频道没有网盘类型子 tab：不要沿用上一个渠道残留的子 tab 名称。
+  if (isTgChannelTab.value) return "资源列表";
+  return props.currentChannelResourceTabs?.[0]?.title || props.activeResourceTab || "资源列表";
 });
 
 const isFilterActive = computed(() => {
@@ -1812,6 +1886,27 @@ const closeMediaDetail = () => {
   background: rgba(var(--v-theme-primary), 0.07);
   border-left: 3px solid rgba(var(--v-theme-primary), 0.55);
   min-width: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.resource-group-header:hover {
+  background: rgba(var(--v-theme-primary), 0.13);
+}
+
+.resource-group-header:focus-visible {
+  outline: 2px solid rgba(var(--v-theme-primary), 0.6);
+  outline-offset: 1px;
+}
+
+.resource-group-header--collapsed {
+  opacity: 0.85;
+}
+
+.resource-group-toggle {
+  flex-shrink: 0;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .resource-group-avatar {

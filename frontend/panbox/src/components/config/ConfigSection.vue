@@ -337,6 +337,20 @@
                       hide-details="auto"
                       class="channel-row__name" />
                     <v-btn
+                      icon="mdi-arrow-up"
+                      variant="text"
+                      color="primary"
+                      title="上移频道（影响结果里的分组顺序）"
+                      :disabled="channelIndex === 0"
+                      @click="moveChannel(field.key, channelIndex, -1)" />
+                    <v-btn
+                      icon="mdi-arrow-down"
+                      variant="text"
+                      color="primary"
+                      title="下移频道（影响结果里的分组顺序）"
+                      :disabled="channelIndex >= channelItems(field.key).length - 1"
+                      @click="moveChannel(field.key, channelIndex, 1)" />
+                    <v-btn
                       icon="mdi-image-search-outline"
                       variant="text"
                       color="primary"
@@ -777,6 +791,15 @@ function emptyChannel() {
 
 function addChannel(key, index) {
   channelItems(key).splice(index + 1, 0, emptyChannel())
+}
+
+/** 上移/下移频道：就地交换数组元素，顺序即持久化到 `tg_channels` 的配置顺序。 */
+function moveChannel(key, index, offset) {
+  const list = channelItems(key)
+  const target = index + offset
+  if (target < 0 || target >= list.length) return
+  const [moved] = list.splice(index, 1)
+  list.splice(target, 0, moved)
 }
 
 function removeChannel(key, index) {
@@ -1486,7 +1509,7 @@ function mediaLibraryWebhookUrl(field, serverName) {
 
 .channel-row {
   display: grid;
-  grid-template-columns: 32px minmax(150px, 1fr) minmax(150px, 1fr) 40px 40px 40px;
+  grid-template-columns: 32px minmax(150px, 1fr) minmax(150px, 1fr) repeat(5, 40px);
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
@@ -1507,7 +1530,7 @@ function mediaLibraryWebhookUrl(field, serverName) {
 
 @media (max-width: 900px) {
   .channel-row {
-    grid-template-columns: 32px minmax(0, 1fr) repeat(3, 36px);
+    grid-template-columns: 32px minmax(0, 1fr) repeat(5, 36px);
     row-gap: 6px;
   }
 
