@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import re
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping, Optional
 
 from app.log import logger
 from app.sdk.network import RequestUtils
@@ -28,6 +28,17 @@ class TelegramChannelClient:
     #: 预览页缓存有效期（秒）与容量。
     _CACHE_TTL = 15 * 60
     _CACHE_SIZE = 256
+    #: 频道展示信息（名称/头像）变化极少，缓存有效期与容量单独放宽。
+    _INFO_CACHE_TTL = 7 * 24 * 60 * 60
+    _INFO_CACHE_SIZE = 512
+    #: 频道对象中用户名、名称与图标的候选键名（兼容旧值与其他写法）。
+    _ID_KEYS = ("id", "username", "user_name", "value", "channel", "url", "link")
+    _NAME_KEYS = ("name", "title", "display_name", "channel_name")
+    _ICON_KEYS = ("icon", "avatar", "avatar_url", "photo", "image", "icon_url")
+    _TITLE_SUFFIX_RE = re.compile(
+        r"\s*[–—\-|]\s*Telegram(?:\s+Messenger)?(?:\s+Web)?\s*$",
+        re.IGNORECASE,
+    )
     _HEADERS = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -51,10 +62,34 @@ class TelegramChannelClient:
         self._cache = create_platform_ttl_cache(
             "tg_channel:search", identity, maxsize=self._CACHE_SIZE, ttl=self._CACHE_TTL
         )
+        self._info_cache = create_platform_ttl_cache(
+            "tg_channel:info", identity,
+            maxsize=self._INFO_CACHE_SIZE, ttl=self._INFO_CACHE_TTL,
+        )
+
+    @staticmethod
+    def _first_text(source: Mapping[str, Any], keys: Any) -> str:
+        """按候选键名顺序取出第一个非空文本值。"""
+        for key in keys:
+            value = source.get(key)
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                return text
+        return ""
 
     @classmethod
     def normalize_channel(cls, value: Any) -> str:
-        """把配置里的频道写法归一为不含 ``@`` 与 ``t.me/s/`` 前缀的用户名。"""
+        """把配置里的频道写法归一为不含 ``@`` 与 ``t.me/s/`` 前缀的用户名。
+
+        兼容两种配置形态：纯字符串（旧值），以及 ``{id, name, icon}`` 对象。
+        """
+        if isinstance(value, Mapping):
+            value = (
+                cls._first_text(value, cls._ID_KEYS)
+                or cls._first_text(value, cls._NAME_KEYS)
+            )
         text = str(value or "").strip()
         if not text:
             return ""
@@ -64,16 +99,66 @@ class TelegramChannelClient:
         text = text.lstrip("@").split("?")[0].split("/")[0].strip()
         return text if cls._CHANNEL_RE.match(text) else ""
 
+    @staticmethod
+    def _normalize_icon(value: Any) -> str:
+        """归一化图标地址：补全协议相对地址，丢弃带空白或过长的值。"""
+        text = str(value or "").strip()
+        if not text or len(text) > 1024 or re.search(r"\s", text):
+            return ""
+        if text.startswith("//"):
+            return f"https:{text}"
+        return text
+
+    @classmethod
+    def normalize_channel_items(cls, values: Any) -> List[Dict[str, str]]:
+        """把频道配置归一为 ``{id, name, icon}`` 对象列表，兼容纯字符串旧值。
+
+        名称缺省时回落为频道用户名，图标缺省时留空表示交给自动获取。
+        """
+        rows = values if isinstance(values, (list, tuple, set)) else [values]
+        items: List[Dict[str, str]] = []
+        seen = set()
+        for value in rows:
+            raw = value if isinstance(value, Mapping) else {}
+            channel = cls.normalize_channel(value)
+            if not channel or channel.casefold() in seen:
+                continue
+            seen.add(channel.casefold())
+            name = cls._first_text(raw, cls._NAME_KEYS)
+            items.append({
+                "id": channel,
+                "name": name or channel,
+                "icon": cls._normalize_icon(cls._first_text(raw, cls._ICON_KEYS)),
+            })
+        return items
+
     @classmethod
     def normalize_channels(cls, values: Any) -> List[str]:
-        """批量归一化频道列表，按原顺序去重并丢弃非法项。"""
-        rows = values if isinstance(values, (list, tuple, set)) else [values]
-        channels: List[str] = []
-        for value in rows:
-            channel = cls.normalize_channel(value)
-            if channel and channel not in channels:
-                channels.append(channel)
-        return channels
+        """批量归一化频道用户名列表，按原顺序去重并丢弃非法项。"""
+        return [item["id"] for item in cls.normalize_channel_items(values)]
+
+    def _fetch_text(
+            self, path: str, params: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """请求 Telegram 公开页面并返回 HTML 文本，失败时抛出异常。"""
+        response = RequestUtils(
+            headers=dict(self._HEADERS),
+            proxies=self._proxies,
+            timeout=self.request_timeout,
+        ).get_res(f"{self.BASE_URL}{path}", params=params or None)
+        try:
+            if response is None:
+                raise TelegramChannelError("请求未返回响应")
+            status = int(getattr(response, "status_code", 0) or 0)
+            if status != 200:
+                raise TelegramChannelError(f"HTTP {status}")
+            return str(getattr(response, "text", "") or "")
+        finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception as error:
+                    logger.debug(f"TG 页面 {path} 响应释放失败：{error}")
 
     def search_channel(
             self, channel: Any, keyword: Any, message_limit: int = 0
@@ -90,27 +175,118 @@ class TelegramChannelClient:
         if cached is not None:
             return [dict(item) for item in cached]
 
-        response = RequestUtils(
-            headers=dict(self._HEADERS),
-            proxies=self._proxies,
-            timeout=self.request_timeout,
-        ).get_res(f"{self.BASE_URL}/s/{normalized}", params={"q": text})
-        try:
-            if response is None:
-                raise TelegramChannelError("请求未返回响应")
-            status = int(getattr(response, "status_code", 0) or 0)
-            if status != 200:
-                raise TelegramChannelError(f"HTTP {status}")
-            messages = self.parse_messages(response.text, normalized, message_limit)
-        finally:
-            if response is not None:
-                try:
-                    response.close()
-                except Exception as error:
-                    logger.debug(f"TG 频道 {normalized} 响应释放失败：{error}")
+        page_html = self._fetch_text(f"/s/{normalized}", {"q": text})
+        messages = self.parse_messages(page_html, normalized, message_limit)
+        # 预览页同时携带频道信息块，顺手缓存频道名称与头像，避免额外请求。
+        info = self.parse_channel_info(page_html, normalized)
+        if info.get("name") or info.get("icon"):
+            self._info_cache[normalized] = info
 
         self._cache[cache_key] = messages
         return [dict(item) for item in messages]
+
+    @classmethod
+    def parse_channel_info(
+            cls, page_html: Any, channel: str = ""
+    ) -> Dict[str, str]:
+        """从频道公开页解析展示信息：用户名、名称与头像地址。
+
+        兼容两种页面形态：``t.me/s/<频道>`` 预览页（头像在
+        ``i.tgme_page_photo_image > img`` 内）与 ``t.me/<频道>`` 主页
+        （``img.tgme_page_photo_image`` 自身即头像）。
+        """
+        normalized = cls.normalize_channel(channel)
+        result = {"id": normalized, "name": "", "icon": ""}
+        content = str(page_html or "")
+        if not content:
+            return result
+        # 延迟导入：BeautifulSoup 只在真正解析时加载。
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(content, "html.parser")
+        photo = soup.select_one(
+            ".tgme_page_photo_image img, img.tgme_page_photo_image, "
+            ".tgme_header_link img"
+        )
+        if photo is not None:
+            result["icon"] = cls._normalize_icon(photo.get("src"))
+        title_node = (
+            soup.select_one(".tgme_channel_info_header_title")
+            or soup.select_one(".tgme_page_title")
+        )
+        if title_node is not None:
+            result["name"] = cls._inline_text(title_node)
+        if not result["name"]:
+            meta = soup.select_one('meta[property="og:title"]')
+            if meta is not None:
+                result["name"] = cls._TITLE_SUFFIX_RE.sub(
+                    "", cls._inline_text(meta.get("content"))
+                ).strip()
+        username_node = soup.select_one(".tgme_channel_info_header_username a")
+        if username_node is not None:
+            resolved = cls.normalize_channel(username_node.get_text(" ", strip=True))
+            if resolved:
+                result["id"] = resolved
+        if not result["id"]:
+            result["id"] = normalized
+        return result
+
+    @staticmethod
+    def _inline_text(node: Any) -> str:
+        """把节点渲染为单行文本（保留表情等内联内容）。"""
+        if node is None:
+            return ""
+        if isinstance(node, str):
+            raw = node
+        else:
+            raw = node.get_text(" ", strip=True)
+        return re.sub(r"\s+", " ", html.unescape(str(raw or ""))).strip()
+
+    def fetch_channel_info(
+            self, channel: Any, force: bool = False
+    ) -> Dict[str, str]:
+        """抓取频道主页并解析名称与头像，结果按长有效期缓存。
+
+        主页体积远小于预览页；``force=True`` 时忽略缓存强制刷新。
+        """
+        normalized = self.normalize_channel(channel)
+        if not normalized:
+            raise TelegramChannelError(f"频道名不合法：{channel}")
+        if not force:
+            cached = self._info_cache.get(normalized)
+            if cached:
+                return dict(cached)
+        page_html = self._fetch_text(f"/{normalized}")
+        info = self.parse_channel_info(page_html, normalized)
+        info["fetched"] = True
+        self._info_cache[normalized] = info
+        return dict(info)
+
+    def resolve_channel_info(self, channel: Any) -> Dict[str, str]:
+        """返回频道展示信息：优先用预览页已解析结果，缺项时补抓主页。
+
+        抓取失败不抛异常，回落到频道用户名，避免影响搜索主流程。
+        """
+        normalized = self.normalize_channel(channel)
+        fallback = {"id": normalized, "name": normalized, "icon": ""}
+        if not normalized:
+            return fallback
+        cached = self._info_cache.get(normalized)
+        if cached and (
+                cached.get("fetched")
+                or (cached.get("name") and cached.get("icon"))
+        ):
+            return dict(cached)
+        try:
+            info = self.fetch_channel_info(normalized)
+        except TelegramChannelError as error:
+            logger.debug(f"TG 频道 {normalized} 头像信息获取失败：{error}")
+            return dict(cached) if cached else fallback
+        if cached:
+            merged = dict(cached)
+            merged.update({k: v for k, v in info.items() if v})
+            return merged
+        return info
 
     @classmethod
     def parse_messages(
@@ -180,9 +356,11 @@ class TelegramChannelClient:
         return links
 
     def clear_cache(self) -> int:
-        """清空预览页缓存并返回被清理的条目数。"""
+        """清空预览页与频道信息缓存，返回被清理的条目总数。"""
         count = len(list(self._cache.items()))
         self._cache.clear()
+        count += len(list(self._info_cache.items()))
+        self._info_cache.clear()
         return count
 
     def sleep_between_channels(self) -> None:

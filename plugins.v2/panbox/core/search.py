@@ -83,6 +83,12 @@ class SearchCandidate(TypedDict, total=False):
     target_episodes: List[int]
     supports_file_preview: bool
     provider_data: Dict[str, Any]
+    #: 来源分组信息：由渠道自行填充，前端据此按来源（如 TG 频道）分组展示。
+    #: 非分组渠道留空，前端维持原有平铺展示。
+    group_key: str
+    group_title: str
+    group_icon: str
+    group_subtitle: str
 
 
 def normalize_search_candidate(

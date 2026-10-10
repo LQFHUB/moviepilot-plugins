@@ -380,7 +380,18 @@
         </div>
 
         <div v-else class="resource-list d-flex flex-column ga-1.5">
-          <div v-for="(res, idx) in displayedResources" :key="resKey(res, idx)" class="resource-row-item">
+          <template v-for="(group, groupIndex) in groupedResources" :key="group.key || `flat-${groupIndex}`">
+            <!-- 来源分组头：仅当候选携带分组信息（如 TG 频道）时渲染，其它渠道保持平铺 -->
+            <div v-if="group.key" class="resource-group-header">
+              <v-avatar size="22" rounded="lg" color="surface-variant" class="resource-group-avatar">
+                <v-img v-if="group.icon" :src="group.icon" cover />
+                <v-icon v-else icon="mdi-telegram" size="14" />
+              </v-avatar>
+              <span class="resource-group-title" :title="group.title">{{ group.title }}</span>
+              <span v-if="group.subtitle" class="resource-group-subtitle">{{ group.subtitle }}</span>
+              <span class="resource-group-count">{{ group.items.length }}</span>
+            </div>
+            <div v-for="({res, idx}) in group.items" :key="resKey(res, idx)" class="resource-row-item">
             <div class="resource-row-header d-flex align-center justify-space-between ga-2">
               <div class="resource-title-box min-w-0 flex-grow-1 d-flex align-center ga-1.5">
                 <span class="resource-title-text min-w-0 flex-grow-1" :title="res.title">
@@ -468,11 +479,39 @@
                   title="一键转存"
                   aria-label="一键转存"
                   @click.stop="handleQuickDownload(res, idx)" />
+
+                <v-btn
+                  v-if="messageLink(res)"
+                  :href="messageLink(res)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon="mdi-telegram"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  class="res-btn-icon"
+                  title="打开频道原始消息"
+                  aria-label="打开频道原始消息" />
               </div>
             </div>
             <div class="resource-row-meta d-flex align-center flex-wrap ga-1.5 mt-1">
               <span v-if="getResourceSize(res)" class="quality-tag-pill tag-size" title="文件体积">
                 {{ getResourceSize(res) }}
+              </span>
+
+              <span
+                v-if="groupResourceMeta(res) && res.update_time"
+                class="quality-tag-pill tag-time"
+                :title="`发布时间 ${res.update_time}`">
+                <v-icon icon="mdi-clock-outline" size="11" class="mr-0.5" />
+                {{ formatResourceTime(res.update_time) }}
+              </span>
+              <span
+                v-if="groupResourceMeta(res) && res.password"
+                class="quality-tag-pill tag-password"
+                :title="`提取码 ${res.password}`">
+                <v-icon icon="mdi-key-outline" size="11" class="mr-0.5" />
+                {{ res.password }}
               </span>
 
               <span
@@ -503,7 +542,8 @@
                 {{ tag }}
               </span>
             </div>
-          </div>
+            </div>
+          </template>
         </div>
       </div>
     </v-card>
@@ -630,6 +670,64 @@ const channelModel = computed({
 const isPointUnlockResource = (res) => defaultIsPointUnlockResource(res);
 
 const displayedResources = computed(() => props.currentChannelFilteredResources || []);
+
+/**
+ * 按来源分组展示候选：候选携带 group_key 时按频道聚合（首个出现顺序），
+ * 否则保持原有平铺顺序，确保其它搜索渠道的展示行为完全不变。
+ */
+const groupedResources = computed(() => {
+  const groups = [];
+  const indexByKey = new Map();
+  (displayedResources.value || []).forEach((res, idx) => {
+    const key = String(res?.group_key || "").trim();
+    if (!key) {
+      groups.push({key: "", title: "", icon: "", subtitle: "", items: [{res, idx}]});
+      return;
+    }
+    let group = indexByKey.get(key);
+    if (!group) {
+      group = {
+        key,
+        title: String(res.group_title || "").trim() || key,
+        icon: String(res.group_icon || "").trim(),
+        subtitle: String(res.group_subtitle || "").trim(),
+        items: [],
+      };
+      indexByKey.set(key, group);
+      groups.push(group);
+    }
+    group.items.push({res, idx});
+  });
+  return groups;
+});
+
+/** 返回候选的来源分组信息，缺失时返回 null（用于按需展示频道专属明细）。 */
+function groupResourceMeta(res) {
+  if (!String(res?.group_key || "").trim()) return null;
+  return {
+    key: String(res.group_key || ""),
+    title: String(res.group_title || "").trim(),
+    icon: String(res.group_icon || "").trim(),
+    subtitle: String(res.group_subtitle || "").trim(),
+  };
+}
+
+/** 返回候选的频道原始消息链接，仅对携带分组信息的渠道生效。 */
+function messageLink(res) {
+  if (!groupResourceMeta(res)) return "";
+  return String(res?.provider_data?.message_url || res?.source_url || "").trim();
+}
+
+/** 把 ISO8601 发布时间格式化为「YYYY-MM-DD HH:mm」，解析失败时返回原值。 */
+function formatResourceTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return text.slice(0, 16);
+  const pad = (num) => String(num).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} `
+    + `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
 
 const currentSubTabLabel = computed(() => {
   const found = (props.currentChannelResourceTabs || []).find((t) => t.value === props.activeResourceTab);
@@ -1703,6 +1801,49 @@ const closeMediaDetail = () => {
 }
 
 /* ================= 现代化流媒体平整行系统 ================= */
+/* 来源分组头：仅候选携带分组信息（如 TG 频道）时出现 */
+.resource-group-header {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(var(--v-theme-primary), 0.07);
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.55);
+  min-width: 0;
+}
+
+.resource-group-avatar {
+  flex-shrink: 0;
+}
+
+.resource-group-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.88);
+}
+
+.resource-group-subtitle {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+}
+
+.resource-group-count {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  background: rgba(var(--v-theme-surface), 0.55);
+}
+
 .resource-row-item {
   position: relative;
   display: flex !important;
@@ -1818,6 +1959,20 @@ const closeMediaDetail = () => {
   color: rgb(var(--v-theme-primary)) !important;
   border-color: rgba(var(--v-theme-primary), 0.38) !important;
   background: rgba(var(--v-theme-primary), 0.1) !important;
+  font-weight: 700 !important;
+}
+
+/* 频道来源明细标签：发布时间与提取码 */
+.tag-time {
+  color: #0ea5e9 !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+  background: rgba(14, 165, 233, 0.1) !important;
+}
+
+.tag-password {
+  color: #f59e0b !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
   font-weight: 700 !important;
 }
 

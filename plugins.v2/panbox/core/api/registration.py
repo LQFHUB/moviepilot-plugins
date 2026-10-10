@@ -211,6 +211,13 @@ class MoviePilotRegistration(OwnerDelegator):
                 "summary": "通过Cloudflare Trace测试搜索代理",
             },
             {
+                "path": "/search/source/info",
+                "endpoint": self.api_vue_search_source_info,
+                "methods": ["POST"],
+                "auth": "bear",
+                "summary": "读取搜索渠道条目信息（如TG频道名称与头像）",
+            },
+            {
                 "path": "/search/preview",
                 "endpoint": self.api_vue_preview_search_resource,
                 "methods": ["POST"],

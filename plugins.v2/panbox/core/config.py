@@ -29,6 +29,13 @@ DEFAULT_TG_CHANNELS = (
     "Remux4KFilm",
 )
 
+#: TG 频道配置的默认对象形态：``{id, name, icon}``；名称缺省回落用户名，
+#: 图标留空表示由频道公开页自动获取，旧版纯字符串列表仍可被归一化读取。
+DEFAULT_TG_CHANNEL_ITEMS = tuple(
+    {"id": channel, "name": channel, "icon": ""}
+    for channel in DEFAULT_TG_CHANNELS
+)
+
 
 class UIConfig:
     """提供 Vue 配置页所需的数据，不再保留旧 iframe/Vuetify 表单。"""
@@ -179,7 +186,7 @@ class UIConfig:
             "search_circuit_breaker_threshold": 3,
             "search_circuit_breaker_cooldown": 60,
             "tg_channel_search_enabled": True,
-            "tg_channels": list(DEFAULT_TG_CHANNELS),
+            "tg_channels": [dict(item) for item in DEFAULT_TG_CHANNEL_ITEMS],
             "subscribe_filter_mode": "exclude",
             "exclude_subscribes": [],
             "include_subscribes": [],

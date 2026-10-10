@@ -19,6 +19,7 @@ from ..magnet import (
     parse_size_str,
 )
 from ..matching import (
+    extract_resource_tags,
     extract_season,
     extract_year,
     media_aliases,
@@ -48,6 +49,8 @@ class TelegramChannelSearchService:
     _MAX_KEYWORDS_PER_CHANNEL = 2
     _MAX_TITLE_LENGTH = 120
     _MAX_DESCRIPTION_LENGTH = 600
+    #: 正文话题标签（TG 频道常用 #剧情 #4K 之类标注），作为候选标签的来源之一。
+    _HASHTAG_RE = re.compile(r"#([A-Za-z0-9\u3400-\u9fff_]{2,16})")
     #: 只识别带单位的体积描述，避免把标题里的年份等纯数字当成字节数。
     _SIZE_TEXT_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:PB|TB|GB|MB|KB)\b", re.IGNORECASE)
 
@@ -60,9 +63,34 @@ class TelegramChannelSearchService:
     ) -> None:
         """初始化服务：频道列表与数量、总超时均来自渠道配置。"""
         self._client = client
-        self._channels = TelegramChannelClient.normalize_channels(channels)
+        self._channel_items = TelegramChannelClient.normalize_channel_items(channels)
+        self._channels = [item["id"] for item in self._channel_items]
+        self._channel_config = {
+            item["id"]: item for item in self._channel_items
+        }
         self._result_limit = max(1, int(result_limit or 20))
         self._timeout = max(5.0, min(float(timeout or 60.0), 120.0))
+
+    def _channel_meta(self, channel: str) -> Dict[str, str]:
+        """汇总频道展示信息：配置的名称/图标优先，缺项用公开页自动获取补齐。"""
+        entry = self._channel_config.get(channel) or {}
+        info: Dict[str, Any] = {}
+        try:
+            info = self._client.resolve_channel_info(channel) or {}
+        except Exception as error:
+            logger.debug(f"[TG频道] {channel} 频道信息读取失败：{error}")
+        configured_name = str(entry.get("name") or "").strip()
+        if not configured_name or configured_name == channel:
+            configured_name = str(info.get("name") or "").strip()
+        icon = str(entry.get("icon") or "").strip() or str(
+            info.get("icon") or ""
+        ).strip()
+        return {
+            "id": channel,
+            "name": configured_name or channel,
+            "icon": icon,
+            "url": f"{TelegramChannelClient.BASE_URL}/{channel}",
+        }
 
     @staticmethod
     def _keywords(mediainfo: Any, media_type: Any, season: Optional[int]) -> List[str]:
@@ -133,6 +161,14 @@ class TelegramChannelSearchService:
         return parse_size_str(matched.group(0)) if matched else 0
 
     @classmethod
+    def _hashtags(cls, text: Any) -> List[str]:
+        """提取正文中的话题标签，与 CloudSaver 的标签口径保持一致。"""
+        return [
+            matched.group(1)
+            for matched in cls._HASHTAG_RE.finditer(str(text or ""))
+        ]
+
+    @classmethod
     def _matches_media(
             cls,
             text: str,
@@ -195,43 +231,67 @@ class TelegramChannelSearchService:
             expected_year: str,
             expected_season: Optional[int],
             limit: int,
+            channel_meta: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         """把命中媒体的消息转换为统一候选（一条消息可产出多条链接候选）。
 
+        字段口径与 pansou、seedhub 等既有渠道对齐，并额外携带来源频道的
+        分组信息（``group_key``、``group_title``、``group_icon``）与频道明细。
         同一频道内重复转发的同一链接只保留最新一条消息的元数据。
         """
+        meta = dict(channel_meta or {})
+        channel_id = str(meta.get("id") or "").strip()
+        channel_name = str(meta.get("name") or "").strip() or channel_id
+        channel_icon = str(meta.get("icon") or "").strip()
+        channel_url = str(meta.get("url") or "").strip()
         candidates: List[Dict[str, Any]] = []
         positions: Dict[tuple, int] = {}
         for message in messages:
             text = str(message.get("text") or "")
             if not cls._matches_media(text, titles, expected_year, expected_season):
                 continue
+            message_channel = str(message.get("channel") or "").strip() or channel_id
+            message_url = str(message.get("url") or "")
             title = cls._extract_title(text)
             description = cls._description(text)
             size = cls._extract_size(text)
+            tags = extract_resource_tags(text, cls._hashtags(text))
             for link in cls._message_links(message):
                 password = cls.extract_password(link["url"], text)
                 target = append_share_password(
                     link["resource_type"], link["url"], password
                 )
+                provider_data: Dict[str, Any] = {
+                    "channel": message_channel,
+                    "channel_name": channel_name,
+                    "channel_icon": channel_icon,
+                    "channel_url": channel_url,
+                    "message_id": str(message.get("message_id") or ""),
+                    "message_url": message_url,
+                }
                 candidate: Dict[str, Any] = {
                     "url": target,
                     "title": title,
                     "resource_type": link["resource_type"],
                     "source": "tg_channel",
-                    "source_url": str(message.get("url") or ""),
+                    "source_url": message_url,
                     "description": description,
                     "size": size,
                     "update_time": str(message.get("published") or ""),
-                    "provider_data": {
-                        "channel": str(message.get("channel") or ""),
-                        "message_id": str(message.get("message_id") or ""),
-                        "message_url": str(message.get("url") or ""),
-                    },
+                    "tags": list(tags),
+                    "group_key": f"tg_channel:{message_channel}",
+                    "group_title": channel_name,
+                    "group_icon": channel_icon,
+                    "group_subtitle": (
+                        f"@{message_channel}" if message_channel else ""
+                    ),
+                    "provider_data": provider_data,
                 }
                 if password:
+                    # 与 pansou 的顶层 ``password`` 以及既有的 ``share_password`` 同时对齐。
+                    candidate["password"] = password
                     candidate["share_password"] = password
-                    candidate["provider_data"]["password"] = password
+                    provider_data["password"] = password
                 key = (link["resource_type"], target)
                 if key in positions:
                     candidates[positions[key]] = candidate
@@ -291,8 +351,10 @@ class TelegramChannelSearchService:
             except Exception as error:
                 logger.warning(f"[TG频道] 频道 {channel} 检索异常：{error}")
                 continue
+            channel_meta = self._channel_meta(channel)
             candidates = self._build_candidates(
-                messages, titles, expected_year, expected_season, limit
+                messages, titles, expected_year, expected_season, limit,
+                channel_meta=channel_meta,
             )
             if candidates:
                 groups.append(candidates)

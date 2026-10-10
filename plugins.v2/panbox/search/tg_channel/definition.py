@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from .client import TelegramChannelClient
 from .provider import create_tg_channel_provider
 from .service import TelegramChannelSearchService
-from ...core.config import DEFAULT_TG_CHANNELS
+from ...core.config import DEFAULT_TG_CHANNEL_ITEMS
 from ...core.definitions import FieldSpec, GroupSpec, SearchSourceDefinition
 from ..types import SUPPORTED_RESOURCE_TYPES
 
@@ -22,14 +22,19 @@ class TelegramChannelSourceDefinition(SearchSourceDefinition):
     order = 55
 
     @classmethod
+    def _channel_items(cls, config: Dict[str, Any]) -> Any:
+        """读取并归一化频道配置为 ``{id, name, icon}`` 对象列表。"""
+        raw = cls.config_value(
+            config, "tg_channels", [dict(item) for item in DEFAULT_TG_CHANNEL_ITEMS]
+        )
+        return TelegramChannelClient.normalize_channel_items(raw or [])
+
+    @classmethod
     def create_client(cls, config: Dict[str, Any], context: Optional[Any] = None) -> Any:
         """按配置构建 TG 频道抓取客户端；未启用或无有效频道时返回 None。"""
         if not bool(cls.config_value(config, "tg_channel_search_enabled", True)):
             return None
-        channels = TelegramChannelClient.normalize_channels(
-            cls.config_value(config, "tg_channels", list(DEFAULT_TG_CHANNELS)) or []
-        )
-        if not channels:
+        if not cls._channel_items(config):
             return None
         return TelegramChannelClient(
             proxy=(context or {}).get("proxy"),
@@ -40,6 +45,31 @@ class TelegramChannelSourceDefinition(SearchSourceDefinition):
                 cls.config_value(config, "tg_channel_request_interval", 1.0) or 1.0
             ),
         )
+
+    @classmethod
+    def resolve_source_info(
+            cls,
+            config: Any,
+            context: Optional[Dict[str, Any]] = None,
+            value: Any = "",
+    ) -> Dict[str, Any]:
+        """抓取指定 TG 频道的名称与头像，供配置页自动填充。"""
+        channel = TelegramChannelClient.normalize_channel(value)
+        if not channel:
+            raise ValueError("频道用户名不合法（只允许字母、数字与下划线，长度 3~64）")
+        client = TelegramChannelClient(
+            proxy=(context or {}).get("proxy"),
+            request_timeout=int(
+                cls.config_value(config, "tg_channel_request_timeout", 15) or 15
+            ),
+            request_interval=0,
+        )
+        info = client.fetch_channel_info(channel, force=True)
+        return {
+            "id": channel,
+            "name": str(info.get("name") or channel),
+            "icon": str(info.get("icon") or ""),
+        }
 
     @classmethod
     def get_config_groups(
@@ -63,13 +93,15 @@ class TelegramChannelSourceDefinition(SearchSourceDefinition):
                     FieldSpec(
                         key="tg_channels",
                         label="TG 频道列表",
-                        type="combobox",
-                        default=list(DEFAULT_TG_CHANNELS),
+                        type="channel-list",
+                        default=[dict(item) for item in DEFAULT_TG_CHANNEL_ITEMS],
                         placeholder="QukanMovie",
-                        hint="逐个填频道用户名（不含 @ 与 t.me/s/ 前缀），回车添加；"
+                        hint="每行填频道的用户名（不含 @ 与 t.me/s/ 前缀）与频道名称；"
+                             "名称留空时会自动从频道公开页获取，频道图标一律自动抓取（无需填写）。"
                              "站内搜索为模糊匹配，结果会按关键词二次过滤。",
                         cols=12,
-                        multiple=True,
+                        # 前端用该标识请求「自动获取名称与图标」接口。
+                        source=cls.id,
                     ),
                     FieldSpec(
                         key="test_tg_channel",
@@ -139,9 +171,7 @@ class TelegramChannelSourceDefinition(SearchSourceDefinition):
         ctx = context or {}
         if not client:
             return None
-        channels = TelegramChannelClient.normalize_channels(
-            cls.config_value(config, "tg_channels", list(DEFAULT_TG_CHANNELS)) or []
-        )
+        channels = cls._channel_items(config)
         if not channels:
             return None
         resource_types = [

@@ -170,6 +170,42 @@ class SearchApi(OwnerDelegator):
                 return str(message)
         return str(error) or error.__class__.__name__
 
+    def api_vue_search_source_info(self, payload: Dict[str, Any]) -> dict:
+        """读取搜索渠道的条目信息（如 TG 频道的名称与头像），供配置页自动填充。"""
+        data = dict(payload or {})
+        source = str(data.get("source") or "").strip().lower()
+        value = str(data.get("value") or data.get("channel") or "").strip()
+        if not source or not value:
+            return {"success": False, "message": "缺少搜索渠道或条目信息"}
+        definition = next(
+            (
+                item for item in SearchSourceRegistry.get_definitions()
+                if item.id == source
+            ),
+            None,
+        )
+        if definition is None:
+            return {"success": False, "message": f"搜索渠道未注册：{source}"}
+        config = self._test_search_config(source, data.get("config"))
+        proxy = build_proxy_url(
+            config.get("search_proxy", ""),
+            config.get("search_proxy_username", ""),
+            config.get("search_proxy_password", ""),
+        )
+        try:
+            info = definition.resolve_source_info(
+                config, {"proxy": proxy}, value
+            )
+        except Exception as error:
+            logger.warning(f"[{source.upper()}] 条目信息读取失败：{error}")
+            return {
+                "success": False,
+                "message": f"{definition.name} 条目信息读取失败：{error}",
+            }
+        if not info:
+            return {"success": False, "message": f"{definition.name} 不支持自动获取条目信息"}
+        return {"success": True, "message": "已获取条目信息", "data": dict(info)}
+
     @staticmethod
     def _preview_file(item: Any) -> Dict[str, Any]:
         if not isinstance(item, dict):
@@ -962,6 +998,15 @@ class SearchApi(OwnerDelegator):
                 "size_bytes": item.get("size") or 0,
                 "tags": self._display_tags(item),
                 "description": str(item.get("description") or "").strip(),
+                "update_time": str(item.get("update_time") or "").strip(),
+                "password": str(
+                    item.get("password") or item.get("share_password") or ""
+                ).strip(),
+                # 来源分组信息（目前由 TG 频道提供）：前端据此按频道分组展示。
+                "group_key": str(item.get("group_key") or "").strip(),
+                "group_title": str(item.get("group_title") or "").strip(),
+                "group_icon": str(item.get("group_icon") or "").strip(),
+                "group_subtitle": str(item.get("group_subtitle") or "").strip(),
                 "source_url": source_url,
                 "url": str(
                     item.get("url") or item.get("share_url")

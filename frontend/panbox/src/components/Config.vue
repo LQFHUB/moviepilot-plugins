@@ -192,6 +192,7 @@
                   :testing-proxy="testingProxy"
                   :testing-auto-subscribe-proxy="testingAutoSubscribeProxy"
                   :hdhive-oauth-action="hdhiveOauthAction"
+                  :fetching-channel-info="fetchingChannelInfo"
                   @scan="openQrCode"
                   @browse-directory="openDirectoryPicker"
                   @test-source="openSourceTest"
@@ -205,6 +206,7 @@
                   @copy-text="copyText"
                   @load-options="loadDynamicOptions"
                   @refresh-options="refreshDynamicOptions"
+                  @fetch-channel-info="fetchChannelInfo"
                   @notify="notify" />
               </div>
             </transition>
@@ -388,6 +390,18 @@
                     <div class="source-test-item-content">
                       <div class="source-test-item-title">{{ item.title }}</div>
                       <div class="source-test-item-meta">
+                        <v-chip
+                          v-if="item.group_title"
+                          size="x-small"
+                          variant="tonal"
+                          color="light-blue"
+                          :title="item.group_subtitle ? `来源频道 ${item.group_subtitle}` : '来源频道'">
+                          <v-avatar v-if="item.group_icon" start size="14">
+                            <v-img :src="item.group_icon" cover />
+                          </v-avatar>
+                          <v-icon v-else start size="12" icon="mdi-telegram" />
+                          {{ item.group_title }}
+                        </v-chip>
                         <v-chip
                           size="x-small"
                           variant="tonal"
@@ -1692,6 +1706,48 @@ async function handleCheckinResult(result) {
 
 let hdhiveOauthWindow = null;
 const hdhiveOauthAction = ref("");
+
+/** 正在自动获取频道信息的行标识（`字段键:行号`），仅用于列表行的 loading。 */
+const fetchingChannelInfo = ref("");
+
+/** 读取搜索渠道条目信息（TG 频道的名称与图标），回填到对应的频道行。 */
+async function fetchChannelInfo({key, index, source, channel} = {}) {
+  const fieldKey = String(key || "").trim();
+  const sourceKey = String(source || "").trim();
+  const rows = Array.isArray(config[fieldKey]) ? config[fieldKey] : [];
+  const row = rows[index];
+  const channelId = String(channel || (row && typeof row === "object" ? row.id : row) || "").trim();
+  if (!fieldKey || !sourceKey) return;
+  if (!channelId) {
+    notify("请先填写频道用户名再自动获取", "warning");
+    return;
+  }
+  const marker = `${fieldKey}:${index}`;
+  fetchingChannelInfo.value = marker;
+  try {
+    const response = unwrapResponse(
+      await api.post("plugin/PanBox/search/source/info", {
+        source: sourceKey,
+        value: channelId,
+        config: sourceTestConfig(sourceKey),
+      }),
+    );
+    if (response.success === false) {
+      throw new Error(response.message || "获取频道信息失败");
+    }
+    const data = response.data?.data || response.data || {};
+    const current = Array.isArray(config[fieldKey]) ? config[fieldKey][index] : null;
+    if (current && typeof current === "object") {
+      if (data.name) current.name = String(data.name);
+      if (data.icon) current.icon = String(data.icon);
+    }
+    notify(`已获取频道信息：${data.name || channelId}`)
+  } catch (error) {
+    notify(error?.response?.data?.message || error.message || String(error), "error")
+  } finally {
+    fetchingChannelInfo.value = "";
+  }
+}
 
 function hdhiveOAuthPayload() {
   return {

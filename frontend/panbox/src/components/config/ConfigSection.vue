@@ -310,6 +310,59 @@
                       @click="removeOnlineDocument(field.key, documentIndex)" />
                   </div>
                 </div>
+                <div v-else-if="field.type === 'channel-list'" class="channel-list">
+                  <div v-if="field.hint" class="text-caption text-medium-emphasis mb-3">{{ field.hint }}</div>
+                  <div
+                    v-for="(channel, channelIndex) in channelItems(field.key)"
+                    :key="`${field.key}-${channelIndex}`"
+                    class="channel-row">
+                    <v-avatar size="32" rounded="lg" color="surface-variant" class="channel-row__avatar">
+                      <v-img v-if="channel.icon" :src="channel.icon" cover />
+                      <v-icon v-else icon="mdi-telegram" size="18" />
+                    </v-avatar>
+                    <v-text-field
+                      v-model="channel.id"
+                      label="频道用户名"
+                      :placeholder="field.placeholder || 'QukanMovie'"
+                      density="compact"
+                      variant="outlined"
+                      hide-details="auto"
+                      class="channel-row__id" />
+                    <v-text-field
+                      v-model="channel.name"
+                      label="频道名称"
+                      placeholder="留空自动获取"
+                      density="compact"
+                      variant="outlined"
+                      hide-details="auto"
+                      class="channel-row__name" />
+                    <v-btn
+                      icon="mdi-image-search-outline"
+                      variant="text"
+                      color="primary"
+                      title="自动获取频道名称与图标"
+                      :loading="fetchingChannelInfo === `${field.key}:${channelIndex}`"
+                      :disabled="Boolean(fetchingChannelInfo)"
+                      @click="emit('fetch-channel-info', {
+                        key: field.key,
+                        index: channelIndex,
+                        source: field.source || '',
+                        channel: channel.id,
+                      })" />
+                    <v-btn
+                      icon="mdi-plus"
+                      variant="text"
+                      color="primary"
+                      title="在下方添加频道"
+                      @click="addChannel(field.key, channelIndex)" />
+                    <v-btn
+                      icon="mdi-delete-outline"
+                      variant="text"
+                      color="error"
+                      title="删除此频道"
+                      @click="removeChannel(field.key, channelIndex)" />
+                  </div>
+                </div>
                 <MultiSelectDialogField
                   v-else-if="(field.type === 'select' || field.type === 'multi-select') && field.multiple"
                   v-model="config[field.key]"
@@ -534,6 +587,8 @@ const props = defineProps({
   testingProxy: { type: Boolean, default: false },
   testingAutoSubscribeProxy: {type: Boolean, default: false},
   hdhiveOauthAction: { type: String, default: "" },
+  //: 正在自动获取频道信息的行标识（`字段键:行号`），用于单行 loading。
+  fetchingChannelInfo: { type: String, default: "" },
 })
 
 function getAccountInfo(field) {
@@ -570,6 +625,7 @@ const emit = defineEmits([
   "load-options",
   "refresh-options",
   "notify",
+  "fetch-channel-info",
 ])
 const hasText = (value) => Boolean(String(value || "").trim())
 
@@ -614,7 +670,7 @@ function executeResetSubtab() {
       else if (field.type === "cloud-directory") defVal = "/";
       else if (field.type === "select" && Array.isArray(field.options) && field.options.length) {
         defVal = field.options[0].value;
-      } else if (["priority-order", "tags", "channels", "plugins"].includes(field.type)) {
+      } else if (["priority-order", "tags", "channels", "plugins", "channel-list"].includes(field.type)) {
         defVal = [];
       } else if (field.type === "online-documents") {
         defVal = [{url: "", resource_types: []}];
@@ -689,6 +745,47 @@ function removeOnlineDocument(key, index) {
     return
   }
   documents.splice(index, 1)
+}
+
+/** 频道列表：旧版纯字符串就地迁移为 { id, name, icon } 对象，保持数组引用稳定。 */
+function channelItems(key) {
+  if (!Array.isArray(props.config[key])) {
+    props.config[key] = []
+  }
+  const list = props.config[key]
+  list.forEach((item, index) => {
+    if (typeof item === "string") {
+      const id = item.trim()
+      if (id) list[index] = { id, name: id, icon: "" }
+      return
+    }
+    if (!item || typeof item !== "object") return
+    if ("id" in item && "name" in item && "icon" in item) return
+    const id = String(item.id || item.username || item.value || "").trim()
+    list[index] = {
+      id,
+      name: String(item.name || item.title || id).trim() || id,
+      icon: String(item.icon || item.avatar || "").trim(),
+    }
+  })
+  return list
+}
+
+function emptyChannel() {
+  return { id: "", name: "", icon: "" }
+}
+
+function addChannel(key, index) {
+  channelItems(key).splice(index + 1, 0, emptyChannel())
+}
+
+function removeChannel(key, index) {
+  const list = channelItems(key)
+  if (list.length <= 1) {
+    list.splice(0, 1, emptyChannel())
+    return
+  }
+  list.splice(index, 1)
 }
 
 function getAssociatedTestSource(group, field) {
@@ -1381,6 +1478,43 @@ function mediaLibraryWebhookUrl(field, serverName) {
 
 .online-documents {
   min-width: 0;
+}
+
+.channel-list {
+  min-width: 0;
+}
+
+.channel-row {
+  display: grid;
+  grid-template-columns: 32px minmax(150px, 1fr) minmax(150px, 1fr) 40px 40px 40px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.channel-row__avatar {
+  align-self: center;
+}
+
+.channel-row :deep(.v-field__input) {
+  min-height: 32px;
+  font-size: 0.8125rem;
+}
+
+.channel-row :deep(.v-label) {
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 900px) {
+  .channel-row {
+    grid-template-columns: 32px minmax(0, 1fr) repeat(3, 36px);
+    row-gap: 6px;
+  }
+
+  .channel-row__name,
+  .channel-row__icon {
+    grid-column: 2 / -1;
+  }
 }
 
 .region-media-map {

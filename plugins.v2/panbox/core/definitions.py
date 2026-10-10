@@ -460,6 +460,20 @@ class SearchSourceDefinition:
         return {}
 
     @classmethod
+    def resolve_source_info(
+            cls,
+            config: Mapping[str, Any],
+            context: Optional[Dict[str, Any]] = None,
+            value: Any = "",
+    ) -> Dict[str, Any]:
+        """解析渠道专有的条目信息（如 TG 频道的名称与头像）。
+
+        默认不支持并返回空字典；支持的渠道需自行归一化 ``value``，返回值
+        直接下发给前端使用。
+        """
+        return {}
+
+    @classmethod
     def close_test_resources(cls) -> None:
         """释放 Definition 持有的可复用测试资源。"""
 
